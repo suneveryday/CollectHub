@@ -1,0 +1,21 @@
+{
+  "ok": true,
+  "upstream_version": "2.7",
+  "content": {
+    "作品ID": "abc123",
+    "作品链接": "https://www.xiaohongshu.com/explore/abc123",
+    "作品标题": "测试标题",
+    "作品描述": "测试正文",
+    "作品类型": "图文",
+    "发布时间": "2024-03-09 16:00:00",
+    "作者昵称": "测试作者",
+    "作品标签": "知识管理 测试",
+    "下载地址": ["https://example.invalid/a", "https://example.invalid/b"],
+    "动图地址": [null, null]
+  },
+  "files": [
+    {"path": "payload/abc123_1.jpeg", "size": 7},
+    {"path": "payload/abc123_2.webp", "size": 7}
+  ],
+  "warnings": ["cookie_not_configured"]
+}

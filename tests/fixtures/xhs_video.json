@@ -1,0 +1,20 @@
+{
+  "ok": true,
+  "upstream_version": "2.7",
+  "content": {
+    "作品ID": "video-ok",
+    "作品链接": "https://www.xiaohongshu.com/explore/video-ok",
+    "作品标题": "视频成功测试",
+    "作品描述": "视频正文",
+    "作品类型": "视频",
+    "发布时间": "2025-02-01 08:00:00",
+    "作者昵称": "视频作者",
+    "作品标签": "视频 测试",
+    "下载地址": ["https://example.invalid/video.mp4"],
+    "动图地址": [null]
+  },
+  "files": [
+    {"path": "payload/video-ok.mp4", "size": 7}
+  ],
+  "warnings": []
+}

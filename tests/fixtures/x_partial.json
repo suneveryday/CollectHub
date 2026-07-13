@@ -1,0 +1,16 @@
+{
+  "ok": true,
+  "tweet_id": "1900000000000000005",
+  "canonical_url": "https://x.com/i/web/status/1900000000000000005",
+  "metadata": [
+    {
+      "tweet_id": "1900000000000000005",
+      "content": "Body survived while one image failed",
+      "media": [{"type": "photo"}, {"type": "photo"}],
+      "user": {"name": "Partial Author"}
+    }
+  ],
+  "fallback": {},
+  "files": [{"path": "only-one.jpg", "kind": "image"}],
+  "gallery_error": "one media download failed"
+}

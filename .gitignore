@@ -1,0 +1,11 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+.DS_Store
+.backups/
+.env
+.env.*
+!.env.example
+*.egg-info/
+data/inbox/

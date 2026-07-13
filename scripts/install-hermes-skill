@@ -1,0 +1,56 @@
+#!/bin/sh
+set -eu
+
+PROJECT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+SOURCE="$PROJECT_DIR/skills/social-media/content-ingestor"
+TARGET="${HERMES_HOME:-$HOME/.hermes}/skills/social-media/content-ingestor"
+BACKUP_ROOT="${HERMES_HOME:-$HOME/.hermes}/backups/skills"
+STAMP=$(date +%Y%m%d-%H%M%S)
+
+echo "Source: $SOURCE"
+echo "Target: $TARGET"
+echo "Backup root: $BACKUP_ROOT"
+echo "Files:"
+find "$SOURCE" -type f -print | sed "s#^$SOURCE/##" | sort
+
+APPLY=0
+RESTART_GATEWAY=0
+for arg in "$@"; do
+  case "$arg" in
+    --apply) APPLY=1 ;;
+    --restart-gateway) RESTART_GATEWAY=1 ;;
+    *)
+      echo "Unknown option: $arg" >&2
+      echo "Usage: $0 [--apply] [--restart-gateway]" >&2
+      exit 2
+      ;;
+  esac
+done
+
+if [ "$APPLY" -ne 1 ]; then
+  echo "Dry run only. Re-run with --apply to install."
+  echo "Add --restart-gateway to restart Hermes after installation."
+  exit 0
+fi
+
+mkdir -p "$(dirname "$TARGET")"
+if [ -e "$TARGET" ]; then
+  mkdir -p "$BACKUP_ROOT"
+  BACKUP="$BACKUP_ROOT/content-ingestor-$STAMP"
+  mv "$TARGET" "$BACKUP"
+  echo "Backup: $BACKUP"
+fi
+cp -R "$SOURCE" "$TARGET"
+echo "Installed: $TARGET"
+
+# Hermes keeps the skills index in an in-process system-prompt cache. Merely
+# replacing SKILL.md (or running /reload-skills) does not update that cache.
+if [ "$RESTART_GATEWAY" -eq 1 ]; then
+  if ! command -v hermes >/dev/null 2>&1; then
+    echo "Installed, but cannot restart: hermes is not on PATH." >&2
+    exit 1
+  fi
+  hermes gateway restart
+else
+  echo "Restart required: hermes gateway restart"
+fi

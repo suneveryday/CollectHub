@@ -1,0 +1,16 @@
+{
+  "ok": true,
+  "tweet_id": "1900000000000000002",
+  "canonical_url": "https://x.com/i/web/status/1900000000000000002",
+  "metadata": [
+    {
+      "tweet_id": "1900000000000000002",
+      "content": "Short fallback",
+      "note_tweet": {"text": "This is the complete long post body."},
+      "user": {"name": "Long Author"}
+    }
+  ],
+  "fallback": {},
+  "files": [],
+  "gallery_error": ""
+}

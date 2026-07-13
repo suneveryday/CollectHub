@@ -1,0 +1,21 @@
+{
+  "ok": true,
+  "upstream_version": "2.7",
+  "content": {
+    "作品ID": "live123",
+    "作品链接": "https://www.xiaohongshu.com/explore/live123",
+    "作品标题": "Live Photo 测试",
+    "作品描述": "图文和动态文件",
+    "作品类型": "图文",
+    "发布时间": "2025-01-01 08:00:00",
+    "作者昵称": "测试作者",
+    "作品标签": "livePhoto",
+    "下载地址": ["https://example.invalid/image"],
+    "动图地址": ["https://example.invalid/live"]
+  },
+  "files": [
+    {"path": "payload/live123_1.jpeg", "size": 5},
+    {"path": "payload/live123_1.mp4", "size": 5}
+  ],
+  "warnings": []
+}

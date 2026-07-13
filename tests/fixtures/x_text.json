@@ -1,0 +1,18 @@
+{
+  "ok": true,
+  "tweet_id": "1900000000000000001",
+  "canonical_url": "https://x.com/i/web/status/1900000000000000001",
+  "metadata": [
+    {
+      "tweet_id": "1900000000000000001",
+      "content": "A plain public post",
+      "date": "2026-07-13T08:00:00+00:00",
+      "user": {"name": "Example Author", "screen_name": "example"},
+      "favorite_count": 12,
+      "retweet_count": 3
+    }
+  ],
+  "fallback": {},
+  "files": [],
+  "gallery_error": ""
+}

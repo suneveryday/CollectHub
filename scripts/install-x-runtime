@@ -1,0 +1,37 @@
+#!/bin/sh
+set -eu
+
+GALLERY_DL_VERSION=1.32.1
+YT_DLP_VERSION=2026.06.09
+RUNTIME_VERSION="gallery-dl-$GALLERY_DL_VERSION"_"yt-dlp-$YT_DLP_VERSION"
+TARGET="${CONTENT_OS_X_RUNTIME_HOME:-$HOME/.local/share/content-os/x-runtime/$RUNTIME_VERSION}"
+STAMP=$(date +%Y%m%d-%H%M%S)
+
+echo "Dependencies: gallery-dl $GALLERY_DL_VERSION, yt-dlp $YT_DLP_VERSION"
+echo "Target: $TARGET"
+echo "Runtime: isolated uv-managed Python 3.12; anonymous X access only"
+
+if [ "${1:-}" != "--apply" ]; then
+  echo "Dry run only. Re-run with --apply to install."
+  exit 0
+fi
+
+command -v uv >/dev/null 2>&1 || { echo "uv is required" >&2; exit 1; }
+PARENT=$(dirname "$TARGET")
+mkdir -p "$PARENT"
+TEMP=$(mktemp -d "$PARENT/.install-x-runtime-XXXXXX")
+uv venv --python 3.12 "$TEMP/.venv"
+uv pip install --python "$TEMP/.venv/bin/python" \
+  "gallery-dl==$GALLERY_DL_VERSION" \
+  "yt-dlp==$YT_DLP_VERSION"
+
+"$TEMP/.venv/bin/python" -m gallery_dl --version
+"$TEMP/.venv/bin/python" -m yt_dlp --version
+
+if [ -e "$TARGET" ]; then
+  BACKUP="$TARGET.bak-$STAMP"
+  mv "$TARGET" "$BACKUP"
+  echo "Backup: $BACKUP"
+fi
+mv "$TEMP" "$TARGET"
+echo "Installed: $TARGET"

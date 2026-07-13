@@ -1,0 +1,41 @@
+#!/bin/sh
+set -eu
+
+VERSION=2.7
+COMMIT=afaf2fb459980fccef9eec74e304a39af2c49cab
+REPOSITORY=https://github.com/JoeanAmier/XHS-Downloader.git
+TARGET="${CONTENT_OS_XHS_HOME:-$HOME/.local/share/content-os/xhs-downloader/$VERSION}"
+STAMP=$(date +%Y%m%d-%H%M%S)
+
+echo "Dependency: XHS-Downloader $VERSION"
+echo "Repository: $REPOSITORY"
+echo "Commit: $COMMIT"
+echo "Target: $TARGET"
+echo "Runtime: isolated uv-managed Python 3.12; no Docker or background service"
+
+if [ "${1:-}" != "--apply" ]; then
+  echo "Dry run only. Re-run with --apply to install."
+  exit 0
+fi
+
+command -v uv >/dev/null 2>&1 || { echo "uv is required" >&2; exit 1; }
+PARENT=$(dirname "$TARGET")
+mkdir -p "$PARENT"
+TEMP=$(mktemp -d "$PARENT/.install-$VERSION-XXXXXX")
+git clone --depth 1 --branch "$VERSION" "$REPOSITORY" "$TEMP/repo"
+ACTUAL=$(git -C "$TEMP/repo" rev-parse HEAD)
+if [ "$ACTUAL" != "$COMMIT" ]; then
+  echo "Unexpected upstream commit: $ACTUAL" >&2
+  exit 1
+fi
+(cd "$TEMP/repo" && uv sync --no-dev --python 3.12)
+
+if [ -e "$TARGET" ]; then
+  BACKUP="$TARGET.bak-$STAMP"
+  mv "$TARGET" "$BACKUP"
+  echo "Backup: $BACKUP"
+fi
+mv "$TEMP/repo" "$TARGET"
+mkdir -p "$TARGET/Volume"
+echo "Installed: $TARGET"
+echo "Version: $(git -C "$TARGET" rev-parse --short HEAD)"

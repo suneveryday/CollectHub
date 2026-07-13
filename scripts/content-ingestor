@@ -1,0 +1,8 @@
+#!/bin/sh
+set -eu
+PROJECT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+HERMES_PYTHON="${HERMES_PYTHON:-$HOME/.hermes/hermes-agent/venv/bin/python}"
+if [ ! -x "$HERMES_PYTHON" ]; then
+  HERMES_PYTHON=python3
+fi
+PYTHONPATH="$PROJECT_DIR/src${PYTHONPATH:+:$PYTHONPATH}" exec "$HERMES_PYTHON" -m content_ingestor.cli "$@"

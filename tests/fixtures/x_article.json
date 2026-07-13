@@ -1,0 +1,16 @@
+{
+  "ok": true,
+  "tweet_id": "1900000000000000003",
+  "canonical_url": "https://x.com/i/web/status/1900000000000000003",
+  "metadata": [
+    {
+      "tweet_id": "1900000000000000003",
+      "content": "Article fallback",
+      "article": {"title": "Article title", "html": "<h1>Article title</h1><p>First paragraph.</p>"},
+      "user": {"name": "Article Author"}
+    }
+  ],
+  "fallback": {},
+  "files": [{"path": "cover.jpg", "kind": "image"}],
+  "gallery_error": ""
+}

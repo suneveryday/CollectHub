@@ -1,0 +1,18 @@
+{
+  "ok": true,
+  "upstream_version": "2.7",
+  "content": {
+    "作品ID": "video123",
+    "作品链接": "https://www.xiaohongshu.com/explore/video123",
+    "作品标题": "视频测试",
+    "作品描述": "只有元数据的视频",
+    "作品类型": "视频",
+    "发布时间": "未知",
+    "作者昵称": "视频作者",
+    "作品标签": "",
+    "下载地址": ["https://example.invalid/video"],
+    "动图地址": [null]
+  },
+  "files": [],
+  "warnings": ["cookie_not_configured"]
+}

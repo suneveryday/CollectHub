@@ -1,0 +1,19 @@
+{
+  "ok": true,
+  "tweet_id": "1900000000000000004",
+  "canonical_url": "https://x.com/i/web/status/1900000000000000004",
+  "metadata": [
+    {
+      "tweet_id": "1900000000000000004",
+      "content": "Video post",
+      "media": [{"type": "video"}, {"type": "photo"}],
+      "user": {"name": "Video Author"}
+    }
+  ],
+  "fallback": {"ok": true},
+  "files": [
+    {"path": "video.mp4", "kind": "video"},
+    {"path": "cover.jpg", "kind": "image"}
+  ],
+  "gallery_error": ""
+}
