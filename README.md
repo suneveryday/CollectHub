@@ -139,6 +139,19 @@ hermes skills list
 
 如果目标 Skill 已存在，安装器会先将旧目录移动到 `~/.hermes/backups/skills/content-ingestor-YYYYMMDD-HHMMSS`。备份不会留在 `~/.hermes/skills` 扫描树中，避免产生同名 Skill 冲突。
 
+### QQ 连续分享
+
+Hermes 应使用 `queue` 模式接收忙碌期间的新消息，避免后一条分享中断当前抓取：
+
+```bash
+hermes config set display.busy_input_mode queue
+hermes gateway restart
+```
+
+连续分享的链接按到达顺序串行抓取。短时间内被 Hermes 合并为同一轮的多个 URL，会通过一次 CLI 调用逐条处理；未合并的消息进入 FIFO 队列。单条失败不会阻断后续链接，最终反馈应列出每条状态并汇总成功、已存在和失败数量。当前运行约定是单次最多连续分享 5 条。
+
+如需临时恢复“新消息中断当前任务”，可在会话中发送 `/busy interrupt`。
+
 ## 验证
 
 ```bash

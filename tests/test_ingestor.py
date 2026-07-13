@@ -199,6 +199,41 @@ class IngestorTests(unittest.TestCase):
             )
         self.assertEqual([result["status"] for result in results], ["failed", "success"])
 
+    def test_five_link_batch_runs_serially_in_input_order(self):
+        urls = [
+            f"https://www.xiaohongshu.com/explore/note-{index}"
+            for index in range(1, 6)
+        ]
+        calls: list[str] = []
+
+        def reader(url: str):
+            calls.append(url)
+            if url.endswith("note-3"):
+                raise AdapterError("content_not_found", "missing")
+            note_id = url.rsplit("/", 1)[-1]
+            payload = staged_payload("xhs_image.json")
+            payload["content"]["作品ID"] = note_id
+            payload["content"]["作品链接"] = url
+            return payload
+
+        with tempfile.TemporaryDirectory() as directory:
+            results = ingest_urls(
+                urls,
+                Path(directory),
+                reader=reader,
+                notion=FakeNotion(),
+            )
+
+        self.assertEqual(calls, urls)
+        self.assertEqual(
+            [result["status"] for result in results],
+            ["success", "success", "failed", "success", "success"],
+        )
+        self.assertEqual(
+            [result["source_url"] for result in results],
+            urls,
+        )
+
     def test_rejects_non_xhs_url(self):
         with tempfile.TemporaryDirectory() as directory:
             results = [
