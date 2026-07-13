@@ -5,10 +5,12 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import patch
 
 from content_ingestor.router import adapter_for
 from content_ingestor.service import ingest_urls
-from content_ingestor.x_adapter import canonicalize_x_url, cleanup_payload, normalize_x
+from content_ingestor.x_adapter import canonicalize_x_url, cleanup_payload, normalize_x, read_x
 from content_ingestor.xhs_adapter import AdapterError
 
 
@@ -88,6 +90,75 @@ class XAdapterTests(unittest.TestCase):
             cleanup_payload(text_payload)
             cleanup_payload(long_payload)
             cleanup_payload(article_payload)
+
+    def test_normalizer_ignores_unrelated_article_from_timeline(self):
+        payload = staged("x_text.json")
+        staging = Path(payload["_staging_dir"])
+        unrelated_html = staging / "unrelated-article.html"
+        unrelated_html.write_text(
+            "<h1>Wrong historical article</h1><p>Wrong body.</p>",
+            encoding="utf-8",
+        )
+        payload["metadata"].append(
+            {
+                "tweet_id": "1800000000000000000",
+                "content": "https://x.com/i/article/old",
+                "article": {"title": "Wrong historical article"},
+            }
+        )
+        payload["files"].append(
+            {"path": unrelated_html.name, "kind": "document"}
+        )
+        try:
+            item = normalize_x(payload, payload["canonical_url"])
+            self.assertEqual(item.content_type, "post")
+            self.assertEqual(item.title, "A plain public post")
+            self.assertEqual(item.body, "A plain public post")
+        finally:
+            cleanup_payload(payload)
+
+    def test_normalizer_rejects_payload_without_target_tweet(self):
+        payload = staged("x_text.json")
+        payload["metadata"][0]["tweet_id"] = "1800000000000000000"
+        try:
+            with self.assertRaisesRegex(
+                AdapterError,
+                "did not contain target tweet 1900000000000000001",
+            ):
+                normalize_x(payload, payload["canonical_url"])
+        finally:
+            cleanup_payload(payload)
+
+    def test_reader_limits_gallery_dl_to_first_post(self):
+        with tempfile.TemporaryDirectory() as directory:
+            python = Path(directory) / "python"
+            python.write_text("", encoding="utf-8")
+            completed = SimpleNamespace(
+                returncode=0,
+                stdout=json.dumps(
+                    {
+                        "tweet_id": "1900000000000000001",
+                        "content": "A plain public post",
+                    }
+                ),
+                stderr="",
+            )
+            with patch(
+                "content_ingestor.x_adapter.x_python",
+                return_value=python,
+            ), patch(
+                "content_ingestor.x_adapter.subprocess.run",
+                return_value=completed,
+            ) as run:
+                payload = read_x(
+                    "https://x.com/example/status/1900000000000000001"
+                )
+            try:
+                command = run.call_args.args[0]
+                option_index = command.index("--post-range")
+                self.assertEqual(command[option_index + 1], "1")
+            finally:
+                cleanup_payload(payload)
 
     def test_routes_x_video_and_persists_only_large_media(self):
         with tempfile.TemporaryDirectory() as directory:

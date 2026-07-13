@@ -47,7 +47,17 @@ def read_x(url: str) -> dict[str, Any]:
     staging = Path(tempfile.mkdtemp(prefix="content-os-x-"))
     config = staging / "gallery-dl.json"
     config.write_text(json.dumps(_gallery_config(staging), ensure_ascii=False), encoding="utf-8")
-    command = [str(python), "-m", "gallery_dl", "--config", str(config), "--quiet", canonical_url]
+    command = [
+        str(python),
+        "-m",
+        "gallery_dl",
+        "--config",
+        str(config),
+        "--quiet",
+        "--post-range",
+        "1",
+        canonical_url,
+    ]
     try:
         proc = subprocess.run(command, text=True, capture_output=True, check=False, timeout=180)
     except subprocess.TimeoutExpired as exc:
@@ -81,7 +91,12 @@ def read_x(url: str) -> dict[str, Any]:
 def normalize_x(payload: dict[str, Any], input_url: str) -> ContentItem:
     tweet_id, canonical_url = canonicalize_x_url(payload.get("canonical_url") or input_url)
     records = payload.get("metadata") if isinstance(payload.get("metadata"), list) else []
-    record = next((item for item in records if _id(item) == tweet_id), records[0] if records else {})
+    record = next((item for item in records if _id(item) == tweet_id), None)
+    if record is None:
+        raise AdapterError(
+            "invalid_parser_output",
+            f"gallery-dl response did not contain target tweet {tweet_id}",
+        )
     note = _mapping(record.get("note_tweet") or record.get("note"))
     article = _mapping(record.get("article"))
     article_html = _article_html(payload, article)
@@ -250,6 +265,8 @@ def _walk_urls(value: Any) -> list[str]:
 
 
 def _article_html(payload: dict[str, Any], article: dict[str, Any]) -> str:
+    if not article:
+        return ""
     direct = _text(article.get("html"))
     if direct:
         return direct
