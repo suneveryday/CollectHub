@@ -4,6 +4,7 @@ import argparse
 import json
 from pathlib import Path
 
+from .config import default_output
 from .doctor import run_doctor
 from .notion import NotionClient, NotionError
 from .service import ingest_urls
@@ -13,14 +14,22 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="content-ingestor")
     subparsers = parser.add_subparsers(dest="command", required=True)
     ingest = subparsers.add_parser(
-        "ingest", help="Route supported platform links into the Notion-first Content OS"
+        "ingest", help="Route supported platform links into the local CollectHub library"
     )
     ingest.add_argument("urls", nargs="+", help="One or more Xiaohongshu or X status URLs")
-    ingest.add_argument("--output", type=Path, default=Path("data/inbox"))
+    ingest.add_argument("--output", type=Path, default=default_output())
     ingest.add_argument(
-        "--force", action="store_true", help="Refresh the Notion record and retained local media"
+        "--force", action="store_true", help="Refresh the local item and any requested sync target"
     )
-    subparsers.add_parser("doctor", help="Check platform runtimes, cookie safety, and Notion access")
+    ingest.add_argument(
+        "--sync", choices=("notion",), help="Explicitly sync the locally saved item to Notion"
+    )
+    doctor = subparsers.add_parser(
+        "doctor", help="Check local platform runtimes and optional sync targets"
+    )
+    doctor.add_argument(
+        "--sync", choices=("notion",), help="Also check the requested sync target"
+    )
     schema = subparsers.add_parser(
         "notion-schema", help="Preview or apply the required Notion database schema"
     )
@@ -31,7 +40,7 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     if args.command == "doctor":
-        payload = run_doctor()
+        payload = run_doctor(sync=args.sync)
     elif args.command == "notion-schema":
         client: NotionClient | None = None
         try:
@@ -50,8 +59,15 @@ def main(argv: list[str] | None = None) -> int:
             if client is not None:
                 client.close()
     else:
-        results = ingest_urls(args.urls, args.output, force=args.force)
-        payload = {"ok": all(result["status"] != "failed" for result in results), "results": results}
+        results = ingest_urls(args.urls, args.output, force=args.force, sync=args.sync)
+        payload = {
+            "ok": all(result["status"] != "failed" for result in results),
+            "sync_ok": all(
+                result.get("sync", {}).get("notion", {}).get("status") != "failed"
+                for result in results
+            ),
+            "results": results,
+        }
     print(json.dumps(payload, ensure_ascii=False, indent=2))
     return 0 if payload["ok"] else 1
 

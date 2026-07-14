@@ -1,0 +1,4 @@
+interface:
+  display_name: "CollectHub Content Ingestor"
+  short_description: "Save Xiaohongshu and X links to a private local library"
+  default_prompt: "Use $content-ingestor to save the provided social links locally, and sync to Notion only if I explicitly request it."

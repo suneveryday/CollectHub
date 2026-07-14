@@ -4,7 +4,7 @@ set -eu
 VERSION=2.7
 COMMIT=afaf2fb459980fccef9eec74e304a39af2c49cab
 REPOSITORY=https://github.com/JoeanAmier/XHS-Downloader.git
-TARGET="${CONTENT_OS_XHS_HOME:-$HOME/.local/share/content-os/xhs-downloader/$VERSION}"
+TARGET="${CONTENT_OS_XHS_HOME:-$HOME/.local/share/collecthub/runtimes/xhs-downloader/$VERSION}"
 STAMP=$(date +%Y%m%d-%H%M%S)
 
 echo "Dependency: XHS-Downloader $VERSION"

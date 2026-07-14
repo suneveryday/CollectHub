@@ -21,13 +21,14 @@ def save_local_item(item: ContentItem, output: Path, *, force: bool = False) -> 
     month_dir.mkdir(parents=True, exist_ok=True)
     temp = Path(tempfile.mkdtemp(prefix=f".{target.name}-", dir=month_dir))
     try:
-        assets_dir = temp / "assets"
-        assets_dir.mkdir()
         failures: list[str] = []
         persistent_media = [
             asset for asset in item.media
-            if item.platform == "xiaohongshu" or asset.kind in {"video", "audio", "live"}
+            if asset.local_path
         ]
+        assets_dir = temp / "assets"
+        if persistent_media:
+            assets_dir.mkdir()
         for index, asset in enumerate(persistent_media, start=1):
             try:
                 source = Path(asset.local_path)
@@ -51,13 +52,15 @@ def save_local_item(item: ContentItem, output: Path, *, force: bool = False) -> 
                 asset.error = str(exc)
                 failures.append(f"{asset.kind}: {exc}")
 
-        status = "success"
+        status = "partial" if item.capture_status in {"media_partial", "metadata_only"} else "success"
         required_kinds = _required_kinds(item.platform, item.content_type, item.media)
         if failures or any(not any(m.kind == kind for m in persistent_media) for kind in required_kinds):
             status = "partial"
             for kind in required_kinds:
                 if not any(m.kind == kind for m in persistent_media):
                     failures.append(f"required {kind} media was not present in the parser response")
+        if status == "partial" and item.capture_status and not failures:
+            failures.append(f"capture status: {item.capture_status}")
 
         metadata = item.to_dict()
         for media in metadata["media"]:
@@ -90,10 +93,7 @@ def find_local_item(output: Path, source_url: str) -> ContentItem | None:
         try:
             payload = json.loads(metadata_path.read_text(encoding="utf-8"))
             media_payload = payload.get("media") if isinstance(payload.get("media"), list) else []
-            if payload.get("ingest_status") != "success" or not any(
-                isinstance(asset, dict) and asset.get("kind") in {"video", "audio", "live"}
-                for asset in media_payload
-            ):
+            if payload.get("ingest_status") != "success":
                 continue
             if source_url not in {payload.get("source_url"), payload.get("input_url")} and (
                 not url_id or url_id != payload.get("source_id")
@@ -106,7 +106,8 @@ def find_local_item(output: Path, source_url: str) -> ContentItem | None:
             item.published_at = _cached_iso_date(item.published_at)
             for asset in item.media:
                 if asset.filename:
-                    asset.local_path = str((target / asset.filename).resolve())
+                    saved_path = _saved_asset_path(target, asset.filename)
+                    asset.local_path = str(saved_path) if saved_path is not None else ""
             _restore_media_urls(item)
             return item
         except (OSError, ValueError, TypeError, KeyError):
@@ -164,6 +165,8 @@ def _result(status: str, item: ContentItem, target: Path, errors: list[str] | No
         "source_id": item.source_id,
         "source_url": item.source_url,
         "content_type": item.content_type,
+        "capture_status": item.capture_status,
+        "local_path": str(target.resolve()),
         "target_dir": str(target.resolve()),
         "errors": errors or [],
     }
@@ -191,15 +194,17 @@ def _existing_local_complete(target: Path, content_type: str) -> bool:
     media = payload.get("media") if isinstance(payload.get("media"), list) else []
     required_kinds = _required_kinds(str(payload.get("platform", "")), content_type, media)
     candidates = [asset for asset in media if isinstance(asset, dict) and asset.get("kind") in required_kinds]
-    if not required_kinds or not candidates:
+    if not required_kinds:
+        return True
+    if not candidates:
         return False
     return all(
         any(
             asset.get("kind") == kind
             and asset.get("status") == "saved"
             and asset.get("filename")
-            and (target / str(asset["filename"])).is_file()
-            and (target / str(asset["filename"])).stat().st_size > 0
+            and (saved_path := _saved_asset_path(target, str(asset["filename"]))) is not None
+            and saved_path.stat().st_size > 0
             for asset in candidates
         )
         for kind in required_kinds
@@ -250,6 +255,16 @@ def _restore_media_urls(item: ContentItem) -> None:
             asset.url = next(downloads, "")
         elif asset.kind == "live":
             asset.url = next(motions, "")
+
+
+def _saved_asset_path(target: Path, filename: str) -> Path | None:
+    try:
+        assets = (target / "assets").resolve()
+        candidate = (target / filename).resolve()
+        candidate.relative_to(assets)
+        return candidate if candidate.is_file() else None
+    except (OSError, ValueError):
+        return None
 
 
 def _metadata_urls(value: object) -> list[str]:

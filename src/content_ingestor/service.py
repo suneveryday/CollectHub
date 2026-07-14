@@ -17,6 +17,7 @@ def ingest_urls(
     force: bool = False,
     reader: Callable[[str], dict] | None = None,
     notion: NotionClient | None = None,
+    sync: str | None = None,
 ) -> list[dict]:
     results: list[dict] = []
     owned_notion: NotionClient | None = None
@@ -39,23 +40,37 @@ def ingest_urls(
                 payload = (reader or adapter.reader)(url)
                 item = adapter.normalizer(payload, url)
             _validate_media(item)
-            if _requires_local_media(item):
-                local_result = save_local_item(item, output, force=force)
-                local_path = local_result["target_dir"]
-                if local_result["status"] == "partial":
-                    if item.platform == "x" and (item.body or item.article.get("plain_text")):
-                        item.capture_status = "media_partial"
-                    else:
-                        raise SaveError("local_media", "local_media_incomplete", "; ".join(local_result["errors"]))
-            client = notion
-            if client is None:
-                if owned_notion is None:
-                    owned_notion = NotionClient()
-                client = owned_notion
-            results.append(client.save_item(item, local_path=local_path, force=force))
+            local_result = save_local_item(item, output, force=force)
+            local_path = local_result["local_path"]
+            if local_result["status"] == "partial":
+                item.capture_status = "media_partial"
+                local_result["capture_status"] = item.capture_status
+            if sync == "notion":
+                try:
+                    client = notion
+                    if client is None:
+                        if owned_notion is None:
+                            owned_notion = NotionClient()
+                        client = owned_notion
+                    synced = client.save_item(item, local_path=local_path, force=force)
+                    notion_result = {
+                        "status": synced["status"],
+                        "url": synced.get("notion_url", ""),
+                    }
+                    local_result["sync"] = {"notion": notion_result}
+                    if notion_result["url"]:
+                        local_result["notion_url"] = notion_result["url"]
+                except NotionError as exc:
+                    local_result["sync"] = {
+                        "notion": {
+                            "status": "failed",
+                            "error": {"stage": exc.stage, "code": exc.code, "message": str(exc)},
+                        }
+                    }
+            results.append(local_result)
         except AdapterError as exc:
             failure = _failure(url, "capture", exc.code, str(exc), local_path)
-            if adapter is not None and adapter.name == "x" and source_id and exc.code in {
+            if sync == "notion" and adapter is not None and adapter.name == "x" and source_id and exc.code in {
                 "authentication_required", "rate_limited", "deleted_or_private"
             }:
                 client = notion
@@ -133,12 +148,6 @@ def _failure(source_url: str, stage: str, code: str, message: str, local_path: s
         result["local_path"] = local_path
         result["target_dir"] = local_path
     return result
-
-
-def _requires_local_media(item: ContentItem) -> bool:
-    if item.platform == "xiaohongshu":
-        return item.content_type in {"video", "live_photo"}
-    return any(asset.kind in {"video", "audio", "live"} and asset.local_path for asset in item.media)
 
 
 def _failed_x_item(source_id: str, canonical_url: str, input_url: str, capture_status: str) -> ContentItem:

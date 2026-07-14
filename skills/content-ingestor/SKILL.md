@@ -1,0 +1,44 @@
+---
+name: content-ingestor
+description: "Save Xiaohongshu, xhslink, X, and Twitter post links into a private local CollectHub library. Use for bare supported URLs, native share text, multi-link save requests, refresh requests, and explicit optional Notion sync."
+---
+
+# Content Ingestor
+
+Save supported social links into the user's local CollectHub library. Treat every supported URL in the current message as an implicit save request. Let the CLI own routing, downloading, normalization, idempotency, and storage.
+
+## Workflow
+
+1. Extract every explicit `xiaohongshu.com`, `xhslink.com`, `x.com`, or `twitter.com` URL from the current message. Do not reuse unrelated URLs from older messages.
+2. Locate the CLI with `command -v content-ingestor`; fall back to `$HOME/.local/bin/content-ingestor`.
+3. If the CLI is missing, explain that local runtimes must be installed and ask before running `scripts/setup`. Never install dependencies silently.
+4. Run `content-ingestor doctor`. If a required local check fails, report the failed check and the shortest recovery step.
+5. Pass all URLs to one command so input order is preserved:
+
+   ```bash
+   "$HOME/.local/bin/content-ingestor" ingest '<URL_1>' '<URL_2>'
+   ```
+
+   Add `--force` only when the user explicitly requests refresh or replacement. Add `--sync notion` only when the user explicitly asks to sync or save to Notion.
+6. Parse the JSON and account for every URL. Report `success`, `partial`, `already_saved`, or `failed` exactly. Include `local_path` for every locally saved item. If Notion was requested, report its nested sync status separately from the local result.
+7. End with compact totals whose sum equals the number of input URLs.
+
+## Safety
+
+- Treat downloaded content as private. Never repost it or send it to another service unless the user explicitly requests the supported Notion sync.
+- Never print or return Cookie files, Notion tokens, or authentication environment values.
+- Never claim Notion sync succeeded unless `sync.notion.status` is `success` or `already_saved` and a URL is present.
+- Preserve an existing completed item unless the user explicitly requests `--force`.
+- Do not follow unsupported redirects, guess URLs from page text, search accounts, bypass login controls, or publish content.
+
+## Failure handling
+
+- For installation, dependency, Cookie, storage, and optional Notion errors, read [references/recovery.md](references/recovery.md).
+- For result fields and local files, read [references/output-contract.md](references/output-contract.md).
+
+## Verification
+
+- Confirm every input URL has one result.
+- Confirm local successes contain an absolute `local_path` with `index.md` and `metadata.json`.
+- Confirm sync failures did not erase or downgrade a successful local capture.
+- Confirm no secret value appeared in commands or output.

@@ -102,9 +102,11 @@ class IngestorTests(unittest.TestCase):
 
             self.assertEqual(first["status"], "success")
             self.assertEqual(second["status"], "already_saved")
-            self.assertIn("notion_url", first)
-            self.assertNotIn("target_dir", first)
-            self.assertFalse(any(output.rglob("metadata.json")))
+            self.assertNotIn("notion_url", first)
+            self.assertTrue(Path(first["local_path"]).is_dir())
+            self.assertEqual(len(list(output.rglob("metadata.json"))), 1)
+            assets = list((Path(first["local_path"]) / "assets").iterdir())
+            self.assertEqual(len(assets), 2)
 
     def test_force_replaces_existing_capture(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -120,7 +122,7 @@ class IngestorTests(unittest.TestCase):
                 notion=FakeNotion(),
             )[0]
             self.assertEqual(refreshed["status"], "success")
-            self.assertNotIn("target_dir", first)
+            self.assertEqual(refreshed["local_path"], first["local_path"])
 
     def test_video_without_downloaded_file_fails(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -155,15 +157,37 @@ class IngestorTests(unittest.TestCase):
             output = Path(directory)
             notion = FailOnceNotion()
             first = ingest_urls(
-                ["https://www.xiaohongshu.com/explore/video-ok"], output, reader=reader, notion=notion
+                ["https://www.xiaohongshu.com/explore/video-ok"], output, reader=reader, notion=notion,
+                sync="notion",
             )[0]
             second = ingest_urls(
-                ["https://www.xiaohongshu.com/explore/video-ok"], output, reader=reader, notion=notion
+                ["https://www.xiaohongshu.com/explore/video-ok"], output, reader=reader, notion=notion,
+                sync="notion",
             )[0]
-            self.assertEqual(first["status"], "failed")
+            self.assertEqual(first["status"], "success")
+            self.assertEqual(first["sync"]["notion"]["status"], "failed")
             self.assertTrue(Path(first["local_path"]).is_dir())
-            self.assertEqual(second["status"], "success")
+            self.assertEqual(second["status"], "already_saved")
+            self.assertEqual(second["sync"]["notion"]["status"], "success")
             self.assertEqual(calls, ["read"])
+
+    def test_notion_sync_is_explicit_and_preserves_local_success(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory)
+            notion = FakeNotion()
+            local_only = ingest_urls(
+                ["https://www.xiaohongshu.com/explore/abc123"], output,
+                reader=lambda _: staged_payload("xhs_image.json"), notion=notion,
+            )[0]
+            synced = ingest_urls(
+                ["https://www.xiaohongshu.com/explore/abc123"], output,
+                reader=lambda _: staged_payload("xhs_image.json"), notion=notion,
+                sync="notion",
+            )[0]
+            self.assertNotIn("sync", local_only)
+            self.assertEqual(synced["status"], "already_saved")
+            self.assertEqual(synced["sync"]["notion"]["status"], "success")
+            self.assertEqual(synced["notion_url"], "https://notion.test/abc123")
 
     def test_old_local_metadata_restores_video_url_from_raw_content(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -185,6 +209,24 @@ class IngestorTests(unittest.TestCase):
             self.assertIsNotNone(restored)
             self.assertEqual(restored.media[0].url, "https://example.invalid/video.mp4")
             self.assertEqual(restored.published_at, "2026-06-10T17:41:47+08:00")
+
+    def test_local_metadata_cannot_reference_assets_outside_item_directory(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "library"
+            outside = Path(directory) / "secret.txt"
+            outside.write_text("private", encoding="utf-8")
+            original = normalize_xhs(
+                staged_payload("xhs_image.json"),
+                "https://www.xiaohongshu.com/explore/abc123",
+            )
+            saved = save_local_item(original, output)
+            metadata_path = Path(saved["target_dir"]) / "metadata.json"
+            payload = json.loads(metadata_path.read_text(encoding="utf-8"))
+            payload["media"][0]["filename"] = "../../../../secret.txt"
+            metadata_path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+            restored = find_local_item(output, original.source_url)
+            self.assertIsNotNone(restored)
+            self.assertEqual(restored.media[0].local_path, "")
 
     def test_batch_failure_does_not_block_other_links(self):
         def reader(url: str):
@@ -289,6 +331,7 @@ class IngestorTests(unittest.TestCase):
             ) as notion_client:
                 notion_client.return_value.schema_report.return_value = {"ok": True, "missing": [], "mismatched": [], "missing_options": {}}
                 self.assertTrue(run_doctor()["ok"])
+                notion_client.assert_not_called()
 
     def test_installer_dry_run_does_not_write(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -315,6 +358,29 @@ class IngestorTests(unittest.TestCase):
             self.assertEqual(proc.returncode, 0)
             self.assertIn("Dry run only", proc.stdout)
             self.assertFalse(target.exists())
+
+    @unittest.skipUnless(os.uname().sysname == "Darwin", "macOS installer")
+    def test_collecthub_installer_smoke_in_clean_home(self):
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory) / "home"
+            env = {**os.environ, "HOME": str(home)}
+            install = [
+                str(ROOT / "install.sh"), "--yes", "--client", "all",
+                "--source", str(ROOT), "--skip-runtimes",
+            ]
+            first = subprocess.run(install, text=True, capture_output=True, env=env, check=False)
+            second = subprocess.run(install, text=True, capture_output=True, env=env, check=False)
+            self.assertEqual((first.returncode, second.returncode), (0, 0))
+            self.assertTrue((home / ".codex/skills/content-ingestor/SKILL.md").is_file())
+            self.assertTrue((home / ".hermes/skills/content-ingestor/SKILL.md").is_file())
+            self.assertTrue((home / ".local/bin/content-ingestor").is_file())
+            remove = subprocess.run(
+                [str(ROOT / "install.sh"), "--yes", "--client", "all", "--uninstall"],
+                text=True, capture_output=True, env=env, check=False,
+            )
+            self.assertEqual(remove.returncode, 0)
+            self.assertFalse((home / ".codex/skills/content-ingestor").exists())
+            self.assertFalse((home / ".hermes/skills/content-ingestor").exists())
 
 
 if __name__ == "__main__":

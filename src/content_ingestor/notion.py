@@ -89,6 +89,12 @@ class NotionClient:
         self.data_source_id = data_source_id or notion_data_source_id()
         if not self.token:
             raise NotionError("notion_auth", "notion_token_missing", "CONTENT_OS_NOTION_TOKEN is not configured")
+        if not self.data_source_id:
+            raise NotionError(
+                "notion_auth",
+                "notion_data_source_missing",
+                "CONTENT_OS_NOTION_DATA_SOURCE_ID is not configured",
+            )
         try:
             import httpx
         except ImportError as exc:  # pragma: no cover - packaging failure
@@ -108,7 +114,7 @@ class NotionClient:
                 # Cloudflare currently blocks the generic python-httpx
                 # fingerprint on some Notion POST requests. Identify this
                 # client explicitly instead of impersonating a browser.
-                "User-Agent": "Content-Ingestor/0.3 (+https://api.notion.com)",
+                "User-Agent": "CollectHub/1.0 (+https://github.com/suneveryday/CollectHub)",
             },
         )
 

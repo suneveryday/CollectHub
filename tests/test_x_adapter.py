@@ -160,7 +160,7 @@ class XAdapterTests(unittest.TestCase):
             finally:
                 cleanup_payload(payload)
 
-    def test_routes_x_video_and_persists_only_large_media(self):
+    def test_routes_x_video_and_persists_all_downloaded_media(self):
         with tempfile.TemporaryDirectory() as directory:
             result = ingest_urls(
                 ["https://x.com/example/status/1900000000000000004"],
@@ -170,7 +170,7 @@ class XAdapterTests(unittest.TestCase):
             )[0]
             self.assertEqual(result["status"], "success")
             assets = {path.name for path in (Path(result["local_path"]) / "assets").iterdir()}
-            self.assertEqual(assets, {"video.mp4"})
+            self.assertEqual(assets, {"video.mp4", "002.jpg"})
 
     def test_partial_media_is_saved_as_partial_without_local_copy(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -183,7 +183,8 @@ class XAdapterTests(unittest.TestCase):
             )[0]
             self.assertEqual(result["status"], "partial")
             self.assertEqual(result["capture_status"], "media_partial")
-            self.assertFalse(any(output.rglob("metadata.json")))
+            self.assertTrue(any(output.rglob("metadata.json")))
+            self.assertEqual(len(list((Path(result["local_path"]) / "assets").iterdir())), 1)
 
     def test_router_supports_xhs_x_and_rejects_unknown_hosts(self):
         self.assertEqual(adapter_for("https://www.xiaohongshu.com/explore/abc").name, "xiaohongshu")
@@ -219,6 +220,7 @@ class XAdapterTests(unittest.TestCase):
                 Path(directory),
                 reader=reader,
                 notion=notion,
+                sync="notion",
             )[0]
         self.assertEqual(result["status"], "failed")
         self.assertEqual(result["error"]["code"], "deleted_or_private")

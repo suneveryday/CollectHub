@@ -20,7 +20,7 @@ from .config import (
 from .notion import NotionClient, NotionError
 
 
-def run_doctor() -> dict:
+def run_doctor(*, sync: str | None = None) -> dict:
     checks: list[dict] = []
     uv = shutil.which("uv")
     checks.append(_check("uv", bool(uv), uv or "uv is not on PATH"))
@@ -55,17 +55,25 @@ def run_doctor() -> dict:
     else:
         checks.append({"name": "cookie_file", "ok": True, "optional": True, "detail": f"not configured: {cookie}"})
 
-    client: NotionClient | None = None
-    try:
-        client = NotionClient()
-        report = client.schema_report()
-        detail = "schema ready" if report["ok"] else f"missing={report['missing']}, mismatched={report['mismatched']}"
-        checks.append(_check("notion", bool(report["ok"]), detail))
-    except NotionError as exc:
-        checks.append(_check("notion", False, f"{exc.code}: {exc}"))
-    finally:
-        if client is not None:
-            client.close()
+    if sync == "notion":
+        client: NotionClient | None = None
+        try:
+            client = NotionClient()
+            report = client.schema_report()
+            detail = "schema ready" if report["ok"] else f"missing={report['missing']}, mismatched={report['mismatched']}"
+            checks.append(_check("notion", bool(report["ok"]), detail))
+        except NotionError as exc:
+            checks.append(_check("notion", False, f"{exc.code}: {exc}"))
+        finally:
+            if client is not None:
+                client.close()
+    else:
+        checks.append({
+            "name": "notion",
+            "ok": True,
+            "optional": True,
+            "detail": "not checked; pass --sync notion to validate",
+        })
 
     return {
         "ok": all(check["ok"] for check in checks),

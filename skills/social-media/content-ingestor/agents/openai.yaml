@@ -1,6 +1,0 @@
-interface:
-  display_name: "Content Ingestor"
-  short_description: "Route social links into the Notion-first Content OS"
-  default_prompt: "Use $content-ingestor to save the provided social-platform links into the unified Notion collection."
-policy:
-  allow_implicit_invocation: true

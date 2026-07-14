@@ -4,7 +4,7 @@ set -eu
 GALLERY_DL_VERSION=1.32.1
 YT_DLP_VERSION=2026.06.09
 RUNTIME_VERSION="gallery-dl-$GALLERY_DL_VERSION"_"yt-dlp-$YT_DLP_VERSION"
-TARGET="${CONTENT_OS_X_RUNTIME_HOME:-$HOME/.local/share/content-os/x-runtime/$RUNTIME_VERSION}"
+TARGET="${CONTENT_OS_X_RUNTIME_HOME:-$HOME/.local/share/collecthub/runtimes/x/$RUNTIME_VERSION}"
 STAMP=$(date +%Y%m%d-%H%M%S)
 
 echo "Dependencies: gallery-dl $GALLERY_DL_VERSION, yt-dlp $YT_DLP_VERSION"

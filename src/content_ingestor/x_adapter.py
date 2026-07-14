@@ -42,7 +42,7 @@ def read_x(url: str) -> dict[str, Any]:
     if not python.is_file():
         raise AdapterError(
             "dependency_missing",
-            "X capture runtime is not installed; run scripts/install-x-runtime --apply",
+            "X capture runtime is not installed; rerun the CollectHub installer with --repair",
         )
     staging = Path(tempfile.mkdtemp(prefix="content-os-x-"))
     config = staging / "gallery-dl.json"

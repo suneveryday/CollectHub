@@ -48,7 +48,7 @@ class NotionTests(unittest.TestCase):
             self.assertFalse(client._client._trust_env)
             self.assertEqual(
                 client._client.headers["User-Agent"],
-                "Content-Ingestor/0.3 (+https://api.notion.com)",
+                "CollectHub/1.0 (+https://github.com/suneveryday/CollectHub)",
             )
         finally:
             client.close()

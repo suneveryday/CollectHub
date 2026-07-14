@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          version: '0.11.7'
+          python-version: '3.12'
+      - run: uv sync --locked
+      - run: uv run python -m unittest discover -s tests -v
+      - run: uvx --from skills-ref agentskills validate skills/content-ingestor
+      - run: sh -n install.sh scripts/content-ingestor scripts/install-hermes-skill scripts/install-xhs-downloader scripts/install-x-runtime skills/content-ingestor/scripts/setup
+      - name: Check repository hygiene
+        run: |
+          ! rg -n '/Users/linny|39c6977d-8940-8009-ba73-000b93ec9385|ntn_[A-Za-z0-9_-]{16,}' \
+            --glob '!tests/**' --glob '!.git/**' .
+
+  install-smoke:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          version: '0.11.7'
+      - name: Install into a clean HOME
+        run: |
+          export HOME="$RUNNER_TEMP/collecthub-home"
+          mkdir -p "$HOME/.codex" "$HOME/.hermes"
+          ./install.sh --yes --client all --source "$GITHUB_WORKSPACE"
+          "$HOME/.local/bin/content-ingestor" doctor
+          test -f "$HOME/.codex/skills/content-ingestor/SKILL.md"
+          test -f "$HOME/.hermes/skills/content-ingestor/SKILL.md"
+          ./install.sh --yes --client all --source "$GITHUB_WORKSPACE"
+          ./install.sh --yes --client all --uninstall
+          test -d "$HOME/CollectHub" || true
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [test, install-smoke]
+    runs-on: macos-15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Build source archive
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          tar -czf "collecthub-$version.tar.gz" \
+            VERSION LICENSE README.md THIRD_PARTY_NOTICES.md install.sh pyproject.toml uv.lock src scripts skills
+          shasum -a 256 "collecthub-$version.tar.gz" > "collecthub-$version.tar.gz.sha256"
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          gh release create "$GITHUB_REF_NAME" \
+            "collecthub-$version.tar.gz" "collecthub-$version.tar.gz.sha256" \
+            --title "CollectHub $GITHUB_REF_NAME" \
+            --generate-notes

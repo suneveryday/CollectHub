@@ -10,12 +10,11 @@ XHS_REPOSITORY = "https://github.com/JoeanAmier/XHS-Downloader.git"
 GALLERY_DL_VERSION = "1.32.1"
 YT_DLP_VERSION = "2026.06.09"
 NOTION_API_VERSION = "2026-03-11"
-DEFAULT_NOTION_DATA_SOURCE_ID = "39c6977d-8940-8009-ba73-000b93ec9385"
 
 
 def xhs_home() -> Path:
     override = os.environ.get("CONTENT_OS_XHS_HOME")
-    return Path(override).expanduser() if override else Path.home() / ".local/share/content-os/xhs-downloader/2.7"
+    return Path(override).expanduser() if override else Path.home() / ".local/share/collecthub/runtimes/xhs-downloader/2.7"
 
 
 def xhs_python() -> Path:
@@ -25,7 +24,7 @@ def xhs_python() -> Path:
 def x_runtime_home() -> Path:
     override = os.environ.get("CONTENT_OS_X_RUNTIME_HOME")
     version = f"gallery-dl-{GALLERY_DL_VERSION}_yt-dlp-{YT_DLP_VERSION}"
-    return Path(override).expanduser() if override else Path.home() / ".local/share/content-os/x-runtime" / version
+    return Path(override).expanduser() if override else Path.home() / ".local/share/collecthub/runtimes/x" / version
 
 
 def x_python() -> Path:
@@ -51,7 +50,12 @@ def notion_token() -> str:
 
 
 def notion_data_source_id() -> str:
-    return os.environ.get("CONTENT_OS_NOTION_DATA_SOURCE_ID", DEFAULT_NOTION_DATA_SOURCE_ID).strip()
+    return os.environ.get("CONTENT_OS_NOTION_DATA_SOURCE_ID", "").strip()
+
+
+def default_output() -> Path:
+    configured = os.environ.get("COLLECTHUB_LIBRARY", "").strip()
+    return Path(configured).expanduser() if configured else Path.home() / "CollectHub"
 
 
 def _private_env_value(path: Path, key: str) -> str:

@@ -26,7 +26,7 @@ def read_xhs(url: str) -> dict[str, Any]:
     if not python.is_file() or not home.is_dir():
         raise AdapterError(
             "dependency_missing",
-            "XHS-Downloader 2.7 is not installed; run scripts/install-xhs-downloader --apply",
+            "XHS-Downloader 2.7 is not installed; rerun the CollectHub installer with --repair",
         )
 
     staging = Path(tempfile.mkdtemp(prefix="content-os-xhs-"))

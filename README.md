@@ -1,36 +1,101 @@
-# 统一知识管理 MVP
+# CollectHub
 
-本项目实现个人使用的 Notion-first Content OS：Hermes 从 QQ Bot 会话中接收受支持平台的内容链接，统一 Content Ingestor 根据 URL 自动选择 Adapter，并将收藏写入 Notion「统一收藏管理」数据库。
+CollectHub 是一个本地优先的 Agent Skill：把小红书和 X/Twitter 单条内容保存为可长期阅读、迁移和检索的 Markdown、JSON 与媒体文件。首版正式支持 macOS 上的 Codex 和 Hermes。
 
-## 当前范围
+## 一行安装
 
-- 支持小红书单条笔记和公开 X 单条帖子链接；不需要用户指定平台。
-- 图文正文和图片只保存到 Notion，不在 `data/inbox` 留副本。
-- 视频的描述和封面图写入 Notion，原始媒体保留在现有本地目录。
-- Live Photo 独立归类；静态内容进入 Notion，动态媒体保留本地。
-- 不包含 AI 摘要、自动分类、内容搜索、评论或发布。
-- X 暂不包含登录 Cookie、搜索、账号历史、完整 Thread 或批量监控。
-
-## 使用前准备
-
-本项目不使用 Docker或常驻服务。第三方下载器使用独立 Python 3.12 环境，每次采集完成后进程立即退出。
-
-先预览依赖安装内容：
+安装固定版本 `v1.0.0`：
 
 ```bash
-./scripts/install-xhs-downloader
-./scripts/install-x-runtime
+curl --proto '=https' --tlsv1.2 -fsSL \
+  https://raw.githubusercontent.com/suneveryday/CollectHub/v1.0.0/install.sh | sh
 ```
 
-确认后安装固定的 XHS-Downloader 2.7：
+安装器会先显示写入位置、依赖和许可证，确认后在用户目录安装：
+
+- CollectHub：`~/.local/share/collecthub/releases/1.0.0`
+- CLI：`~/.local/bin/content-ingestor`
+- Skill：自动检测 `~/.codex/skills/`、`~/.hermes/skills/` 或两者
+- 本地内容库：`~/CollectHub`
+
+同时安装固定版本的隔离 Python 3.12、XHS-Downloader 2.7、gallery-dl 1.32.1 和 yt-dlp 2026.06.09，不修改系统 Python。仅支持 macOS arm64 和 x86_64。
+
+非交互安装、预览、修复与卸载：
 
 ```bash
-./scripts/install-xhs-downloader --apply
-./scripts/install-x-runtime --apply
-./scripts/content-ingestor doctor
+curl -fsSL https://raw.githubusercontent.com/suneveryday/CollectHub/v1.0.0/install.sh | sh -s -- --yes
+curl -fsSL https://raw.githubusercontent.com/suneveryday/CollectHub/v1.0.0/install.sh | sh -s -- --dry-run
+curl -fsSL https://raw.githubusercontent.com/suneveryday/CollectHub/v1.0.0/install.sh | sh -s -- --yes --repair
+curl -fsSL https://raw.githubusercontent.com/suneveryday/CollectHub/v1.0.0/install.sh | sh -s -- --yes --uninstall
 ```
 
-默认不需要 Cookie。需要更高画质或访问受限内容时，可由用户手动创建安全文件：
+卸载不会删除 `~/CollectHub`。现有 Skill 和旧版本会先移到非扫描备份目录。
+
+## 使用
+
+重启 Codex 或开启新的 Hermes 会话，然后直接发送支持的链接，例如：
+
+```text
+帮我保存 https://www.xiaohongshu.com/explore/NOTE_ID
+收藏 https://x.com/username/status/TWEET_ID
+```
+
+裸链接和原生分享文本都会触发保存。一次消息可包含多个链接，按出现顺序串行处理；单条失败不会阻断后续内容。
+
+也可以直接使用 CLI：
+
+```bash
+~/.local/bin/content-ingestor doctor
+~/.local/bin/content-ingestor ingest \
+  'https://www.xiaohongshu.com/explore/NOTE_ID' \
+  'https://x.com/username/status/TWEET_ID'
+```
+
+默认输出可通过参数或环境变量修改：
+
+```bash
+content-ingestor ingest '<URL>' --output "$HOME/MyLibrary"
+export COLLECTHUB_LIBRARY="$HOME/MyLibrary"
+```
+
+只有明确需要刷新已有内容时才使用 `--force`。
+
+## 本地文件
+
+每条内容保存在：
+
+```text
+~/CollectHub/YYYY/MM/<platform>/<title>--<content-id>/
+├── index.md
+├── metadata.json
+└── assets/            # 有媒体时创建
+```
+
+状态包括 `success`、`partial`、`already_saved` 和 `failed`。成功、部分成功及已存在结果都返回绝对 `local_path`。
+
+## 可选 Notion 同步
+
+Notion 默认关闭，且仓库不包含任何个人 data source ID。先在本地安全配置：
+
+```bash
+export CONTENT_OS_NOTION_TOKEN='ntn_...'
+export CONTENT_OS_NOTION_DATA_SOURCE_ID='your_data_source_id'
+content-ingestor notion-schema
+content-ingestor notion-schema --apply
+content-ingestor doctor --sync notion
+```
+
+只有显式添加 `--sync notion` 才会同步：
+
+```bash
+content-ingestor ingest '<URL>' --sync notion
+```
+
+Notion 同步失败不会删除本地内容，也不会把本地成功改成失败。不要把 Token 或 Cookie 发到聊天、命令参数或仓库中。
+
+## 小红书 Cookie
+
+公开内容通常无需 Cookie。确有需要时，用本地编辑器写入受限文件：
 
 ```bash
 mkdir -p ~/.config/content-os
@@ -39,128 +104,18 @@ chmod 700 ~/.config/content-os
 chmod 600 ~/.config/content-os/xhs-cookie.txt
 ```
 
-不要把 Cookie 作为命令参数或聊天内容发送。程序只在一次性 bridge 进程中读取该文件，不写入日志、Markdown 或 metadata。
+程序只在一次性下载进程中读取该文件，不会把内容写入日志、Markdown 或 metadata。CollectHub 不提供登录绕过、账号搜索、批量监控、评论或发布能力。
 
-创建 Notion internal integration，将「统一收藏管理」数据库分享给它。若 Hermes 已通过 Notion MCP 完成授权，CLI 会安全复用 `~/.hermes/.env` 中的 `NOTION_TOKEN`；无需再配置第二份凭证。
-
-非 Hermes 环境可以显式配置项目变量：
+## 从源码开发
 
 ```bash
-export CONTENT_OS_NOTION_TOKEN='ntn_...'
+uv sync --locked --python 3.12
+uv run python -m unittest discover -s tests -v
+./install.sh --dry-run --source "$PWD"
 ```
 
-目标 data source 默认是本项目指定的「统一收藏管理」。需要切换环境时可以覆盖：
+Skill 位于 `skills/content-ingestor`，遵循 [Agent Skills](https://agentskills.io) 目录规范。Codex 用户也可通过 Skill Installer 安装该 GitHub 目录；Hermes 用户可运行 `hermes skills install suneveryday/CollectHub/skills/content-ingestor`，随后首次使用时按提示运行 Skill 内的 setup 脚本安装本地运行时。
 
-```bash
-export CONTENT_OS_NOTION_DATA_SOURCE_ID='39c6977d-8940-8009-ba73-000b93ec9385'
-```
+## 许可证与第三方组件
 
-不要把 Notion token 写入仓库、命令输出或聊天内容。数据库 schema 命令默认只预览：
-
-```bash
-./scripts/content-ingestor notion-schema
-./scripts/content-ingestor notion-schema --apply
-./scripts/content-ingestor doctor
-```
-
-## CLI 调试入口
-
-```bash
-./scripts/content-ingestor ingest \
-  'https://www.xiaohongshu.com/explore/NOTE_ID' \
-  'https://x.com/username/status/TWEET_ID' \
-  --output ./data/inbox
-```
-
-可以一次传入不同平台的多个链接。CLI 按严格域名和路径选择 Adapter；默认使用「平台 + 内容 ID」在 Notion 中去重，已完成记录返回 `already_saved`。`partial` 记录会在下次提交时自动补抓；只有明确需要刷新完整记录时才添加 `--force`。
-
-## Notion 图文排版
-
-写入 Notion 时会按来源平台保留原始阅读顺序，而不是统一把图片追加到正文末尾：
-
-- 小红书图文按轮播图顺序写入图片，再写正文描述；标题仍保存在 Notion 页面标题字段。
-- 普通 X 帖子和 Long Post 先写正文，再写帖子附件图片。
-- X Article 根据抓取到的 HTML 原位转换标题、段落、列表、引用、链接、基础行内格式和图片。
-
-X Article 提供了图片与段落之间的明确锚点，因此可以精确还原。小红书当前抓取数据只提供有序图片列表和完整描述，无法判断某张图片属于描述中的第几段，所以采用平台原生的「轮播图在前、描述在后」结构。
-
-如需更新已经保存的历史内容，传入原链接并显式重刷：
-
-```bash
-./scripts/content-ingestor ingest \
-  'https://www.xiaohongshu.com/explore/NOTE_ID' \
-  'https://x.com/username/status/TWEET_ID' \
-  --output ./data/inbox \
-  --force
-```
-
-`--force` 会重新抓取来源，并在同一条 Notion 记录中清空旧正文 blocks 后按新规则写回，不会创建重复记录。来源已删除、转为私密或当前账号无权访问时无法重刷。
-
-## 保存结构
-
-图文没有本地输出目录。视频和 Live Photo 继续使用：
-
-```text
-data/inbox/YYYY/MM/xiaohongshu/标题--note-id/
-├── index.md
-├── metadata.json
-└── assets/
-    ├── 001.jpg
-    ├── video.mp4
-    └── live-002.mp4
-```
-
-X 的纯文本、图片和 Article 在写入 Notion 后清理 staging；包含视频或音频时，仅保留大媒体及索引：
-
-```text
-data/inbox/YYYY/MM/x/标题--tweet-id/
-├── index.md
-├── metadata.json
-└── assets/
-    └── video.mp4
-```
-
-状态包括 `success`、`partial`、`already_saved` 和 `failed`。`success` 必须表示 Notion 已完整写入，且要求保留的本地大媒体已经保存；`partial` 表示正文可用并已入库，但媒体不完整。成功结果包含 `content_type`、`capture_status` 和 `notion_url`，保留本地媒体时还包含 `local_path`。失败结果返回 `stage`、`code` 和 `message`。
-
-## Hermes Skill
-
-源码位于 `skills/social-media/content-ingestor`。安装器默认只预览：
-
-```bash
-./scripts/install-hermes-skill
-```
-
-确认后安装：
-
-```bash
-./scripts/install-hermes-skill --apply
-hermes skills list
-```
-
-如果目标 Skill 已存在，安装器会先将旧目录移动到 `~/.hermes/backups/skills/content-ingestor-YYYYMMDD-HHMMSS`。备份不会留在 `~/.hermes/skills` 扫描树中，避免产生同名 Skill 冲突。
-
-### QQ 连续分享
-
-Hermes 应使用 `queue` 模式接收忙碌期间的新消息，避免后一条分享中断当前抓取：
-
-```bash
-hermes config set display.busy_input_mode queue
-hermes gateway restart
-```
-
-连续分享的链接按到达顺序串行抓取。短时间内被 Hermes 合并为同一轮的多个 URL，会通过一次 CLI 调用逐条处理；未合并的消息进入 FIFO 队列。单条失败不会阻断后续链接，最终反馈应列出每条状态并汇总成功、已存在和失败数量。当前运行约定是单次最多连续分享 5 条。
-
-如需临时恢复“新消息中断当前任务”，可在会话中发送 `/busy interrupt`。
-
-## 验证
-
-```bash
-PYTHONPATH=src ~/.hermes/hermes-agent/venv/bin/python \
-  -m unittest discover -s tests -v
-```
-
-自动化测试使用固定 fixture 和 mock Notion 客户端，不依赖实时平台、Notion 或用户登录态。
-
-## 第三方边界
-
-XHS-Downloader 固定为 2.7 / `afaf2fb459980fccef9eec74e304a39af2c49cab`。X runtime 固定为 gallery-dl 1.32.1 与 yt-dlp 2026.06.09。三者均安装到用户本地隔离环境并通过独立进程调用。详见 `THIRD_PARTY_NOTICES.md`。
+CollectHub 使用 [MIT License](LICENSE)。下载器和运行时作为独立程序安装并通过子进程调用，不复制进本仓库；其许可证与固定版本见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。用户应遵守来源平台条款及适用法律，仅保存自己有权访问和使用的内容。
