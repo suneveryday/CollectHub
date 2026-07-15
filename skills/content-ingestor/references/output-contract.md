@@ -14,6 +14,8 @@ Each item contains:
 
 Schema v3 adds `capture_policy` and structured `subtitles`. Video platforms use `metadata_subtitles`: missing video/audio files are intentional, and a source with no available subtitles can still be complete.
 
+YouTube and TikTok video commands automatically request a Notion bookmark. The local item remains a small idempotency and recovery record; Notion receives the original source URL in both the source-link and video-link properties, with no local media path advertised as a downloaded video.
+
 Top-level statuses:
 
 - `success`: local content and required media were saved.

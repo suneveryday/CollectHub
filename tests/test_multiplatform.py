@@ -191,6 +191,33 @@ class MultiPlatformTests(unittest.TestCase):
             restored = find_local_item(Path(directory) / "library", "https://www.youtube.com/watch?v=abcdefghijk")
             self.assertIsNotNone(restored)
 
+    def test_youtube_video_defaults_to_notion_bookmark_without_local_media_path(self):
+        class BookmarkNotion:
+            def __init__(self):
+                self.local_paths = []
+
+            def save_item(self, item, *, local_path="", force=False):
+                self.local_paths.append(local_path)
+                return {"status": "success", "notion_url": f"https://notion.test/{item.source_id}"}
+
+        with tempfile.TemporaryDirectory() as directory:
+            notion = BookmarkNotion()
+            payload = {
+                "info": {"id": "abcdefghijk", "title": "Video"},
+                "files": [],
+                "_staging_dir": directory,
+            }
+            result = ingest_urls(
+                ["https://youtu.be/abcdefghijk"],
+                Path(directory) / "library",
+                reader=lambda _: payload,
+                notion=notion,
+                auto_video_notion=True,
+            )[0]
+        self.assertEqual(result["sync"]["notion"]["status"], "success")
+        self.assertEqual(result["notion_url"], "https://notion.test/abcdefghijk")
+        self.assertEqual(notion.local_paths, [""])
+
     def test_missing_subtitles_is_still_complete(self):
         with tempfile.TemporaryDirectory() as directory:
             payload = {"info": {"id": "abcdefghijk", "title": "No captions"}, "files": [], "_staging_dir": directory}

@@ -199,6 +199,7 @@ class NotionClient:
             existing
             and _select_value(existing, "保存状态") == "已完成"
             and _select_value(existing, "抓取状态") == "complete"
+            and not _video_bookmark_needs_refresh(item, existing)
             and not force
         ):
             return self._result("already_saved", item, existing, local_path)
@@ -266,6 +267,8 @@ class NotionClient:
         self, item: ContentItem, local_path: str, status: str, error: str
     ) -> dict[str, Any]:
         video_url = next((asset.url for asset in item.media if asset.kind in {"video", "live"} and asset.url), "")
+        if item.platform in {"youtube", "tiktok"} and item.content_type == "video":
+            video_url = item.source_url
         properties: dict[str, Any] = {
             "名称": _title(item.title),
             "平台": {"select": {"name": _platform_label(item.platform)}},
@@ -633,6 +636,16 @@ def _select_value(page: dict[str, Any], name: str) -> str:
     prop = page.get("properties", {}).get(name, {})
     selected = prop.get("select") if isinstance(prop, dict) else None
     return str(selected.get("name") or "") if isinstance(selected, dict) else ""
+
+
+def _video_bookmark_needs_refresh(item: ContentItem, page: dict[str, Any]) -> bool:
+    if item.platform not in {"youtube", "tiktok"} or item.content_type != "video":
+        return False
+    properties = page.get("properties", {})
+    source_url = properties.get("原文链接", {}).get("url")
+    video_url = properties.get("视频链接", {}).get("url")
+    local_path = properties.get("本地媒体路径", {}).get("rich_text") or []
+    return source_url != item.source_url or video_url != item.source_url or bool(local_path)
 
 
 def _title(value: str) -> dict[str, Any]:

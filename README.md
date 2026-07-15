@@ -57,16 +57,16 @@ CollectHub 首版支持 macOS（Apple Silicon 和 Intel），可安装到 Codex�
 
 ```bash
 curl --proto '=https' --tlsv1.2 -fsSL \
-  https://raw.githubusercontent.com/suneveryday/CollectHub/v1.1.1/install.sh | sh
+  https://raw.githubusercontent.com/suneveryday/CollectHub/v1.1.2/install.sh | sh
 ```
 
 安装器会先说明将要安装的内容和写入位置，得到确认后才会继续。它使用独立运行环境，不会修改系统 Python。
 
 安装完成后，重启 Codex 或开启新的 Hermes 会话，然后发送链接即可。裸链接、平台分享文本和同时包含多个链接的消息都可以直接处理。
 
-## 04 · 内容留在本地
+## 04 · 本地内容与视频书签
 
-所有内容默认保存在 `~/CollectHub`：
+除 YouTube / TikTok 视频书签外，内容默认保存在 `~/CollectHub`：
 
 ```text
 ~/CollectHub/
@@ -86,9 +86,9 @@ curl --proto '=https' --tlsv1.2 -fsSL \
 | 内容类型 | 文字、图片、封面、字幕、视频元数据、Live Photo、长帖、Article、网页 |
 | Agent | Codex、Hermes |
 | 操作系统 | macOS arm64、macOS x86_64 |
-| 保存位置 | 本地目录；可选 Notion |
+| 保存位置 | 本地目录；YouTube / TikTok 视频默认 Notion 书签 |
 
-CollectHub 专注于保存你提供的单条内容链接。YouTube、TikTok 和 Facebook 默认只保存元数据、简介、封面和可用字幕，不下载视频或音频。普通网页只做静态提取，不运行脚本，也不处理登录墙、付费墙、验证码或 PDF。
+CollectHub 专注于保存你提供的单条内容链接。YouTube 和 TikTok 不下载视频或音频：本地只保留用于去重和恢复的小型元数据，并默认在已配置的 Notion 中创建收藏记录、保存原视频链接。Facebook 也不下载音视频，但仍遵循本地优先。普通网页只做静态提取，不运行脚本，也不处理登录墙、付费墙、验证码或 PDF。
 
 它不提供账号批量抓取、频道/播放列表采集、平台搜索、登录绕过、AI 摘要、评论或内容发布。
 
@@ -96,7 +96,7 @@ CollectHub 专注于保存你提供的单条内容链接。YouTube、TikTok 和 
 
 ## 可选：同步到 Notion
 
-Notion 默认关闭。完成本地配置后，在请求中明确说“同步到 Notion”，或使用：
+Notion 对一般内容默认关闭；YouTube 和 TikTok 视频例外，它们在 Notion 已配置时自动创建书签。其他内容需要在请求中明确说“同步到 Notion”，或使用：
 
 ```bash
 content-ingestor ingest '<URL>' --sync notion
@@ -116,19 +116,19 @@ content-ingestor doctor
 预览安装内容：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/suneveryday/CollectHub/v1.1.1/install.sh | sh -s -- --dry-run
+curl -fsSL https://raw.githubusercontent.com/suneveryday/CollectHub/v1.1.2/install.sh | sh -s -- --dry-run
 ```
 
 修复安装：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/suneveryday/CollectHub/v1.1.1/install.sh | sh -s -- --yes --repair
+curl -fsSL https://raw.githubusercontent.com/suneveryday/CollectHub/v1.1.2/install.sh | sh -s -- --yes --repair
 ```
 
 卸载程序：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/suneveryday/CollectHub/v1.1.1/install.sh | sh -s -- --yes --uninstall
+curl -fsSL https://raw.githubusercontent.com/suneveryday/CollectHub/v1.1.2/install.sh | sh -s -- --yes --uninstall
 ```
 
 卸载不会删除 `~/CollectHub` 中已经保存的内容。

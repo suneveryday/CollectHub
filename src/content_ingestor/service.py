@@ -18,6 +18,7 @@ def ingest_urls(
     reader: Callable[[str], dict] | None = None,
     notion: NotionClient | None = None,
     sync: str | None = None,
+    auto_video_notion: bool = False,
 ) -> list[dict]:
     results: list[dict] = []
     owned_notion: NotionClient | None = None
@@ -45,14 +46,25 @@ def ingest_urls(
             if local_result["status"] == "partial":
                 item.capture_status = "media_partial"
                 local_result["capture_status"] = item.capture_status
-            if sync == "notion":
+            should_sync_notion = sync == "notion" or (
+                auto_video_notion
+                and item.platform in {"youtube", "tiktok"}
+                and item.content_type == "video"
+            )
+            if should_sync_notion:
                 try:
                     client = notion
                     if client is None:
                         if owned_notion is None:
                             owned_notion = NotionClient()
                         client = owned_notion
-                    synced = client.save_item(item, local_path=local_path, force=force)
+                    notion_local_path = (
+                        ""
+                        if item.platform in {"youtube", "tiktok"}
+                        and item.capture_policy == "metadata_subtitles"
+                        else local_path
+                    )
+                    synced = client.save_item(item, local_path=notion_local_path, force=force)
                     notion_result = {
                         "status": synced["status"],
                         "url": synced.get("notion_url", ""),

@@ -65,14 +65,20 @@ def notion_token() -> str:
     configured = os.environ.get("NOTION_TOKEN", "").strip()
     if configured:
         return configured
-    hermes_env = Path(
-        os.environ.get("CONTENT_OS_HERMES_ENV", Path.home() / ".hermes/.env")
-    ).expanduser()
-    return _private_env_value(hermes_env, "NOTION_TOKEN")
+    return _private_env_value(_hermes_env(), "NOTION_TOKEN")
 
 
 def notion_data_source_id() -> str:
-    return os.environ.get("CONTENT_OS_NOTION_DATA_SOURCE_ID", "").strip()
+    configured = os.environ.get("CONTENT_OS_NOTION_DATA_SOURCE_ID", "").strip()
+    if configured:
+        return configured
+    return _private_env_value(_hermes_env(), "CONTENT_OS_NOTION_DATA_SOURCE_ID")
+
+
+def _hermes_env() -> Path:
+    return Path(
+        os.environ.get("CONTENT_OS_HERMES_ENV", Path.home() / ".hermes/.env")
+    ).expanduser()
 
 
 def default_output() -> Path:

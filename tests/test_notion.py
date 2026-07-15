@@ -6,7 +6,12 @@ import unittest
 from pathlib import Path
 
 from content_ingestor.models import ContentItem, MediaAsset
-from content_ingestor.notion import NotionClient, NotionError, _split_text
+from content_ingestor.notion import (
+    NotionClient,
+    NotionError,
+    _split_text,
+    _video_bookmark_needs_refresh,
+)
 
 
 def item(content_type="image", media=None, platform="xiaohongshu", capture_status="complete"):
@@ -96,6 +101,38 @@ class NotionTests(unittest.TestCase):
         self.assertEqual(payload["平台"]["select"]["name"], "X")
         self.assertEqual(payload["内容类型"]["select"]["name"], "Long Post")
         self.assertEqual(payload["抓取状态"]["select"]["name"], "media_partial")
+
+    def test_youtube_and_tiktok_bookmarks_use_source_as_video_url(self):
+        client = BlockClient()
+        for platform, source_url in (
+            ("youtube", "https://www.youtube.com/watch?v=abcdefghijk"),
+            ("tiktok", "https://www.tiktok.com/@creator/video/123456"),
+        ):
+            video = item("video", platform=platform)
+            video.source_url = source_url
+            payload = client._properties(video, "", "已完成", "")
+            self.assertEqual(payload["原文链接"]["url"], source_url)
+            self.assertEqual(payload["视频链接"]["url"], source_url)
+
+    def test_legacy_video_bookmark_without_video_url_requires_refresh(self):
+        video = item("video", platform="youtube")
+        video.source_url = "https://www.youtube.com/watch?v=abcdefghijk"
+        legacy = {
+            "properties": {
+                "原文链接": {"url": video.source_url},
+                "视频链接": {"url": None},
+                "本地媒体路径": {"rich_text": []},
+            }
+        }
+        current = {
+            "properties": {
+                "原文链接": {"url": video.source_url},
+                "视频链接": {"url": video.source_url},
+                "本地媒体路径": {"rich_text": []},
+            }
+        }
+        self.assertTrue(_video_bookmark_needs_refresh(video, legacy))
+        self.assertFalse(_video_bookmark_needs_refresh(video, current))
 
     def test_xhs_images_keep_source_order_before_body(self):
         with tempfile.TemporaryDirectory() as directory:

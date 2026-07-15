@@ -22,7 +22,8 @@ def build_parser() -> argparse.ArgumentParser:
         "--force", action="store_true", help="Refresh the local item and any requested sync target"
     )
     ingest.add_argument(
-        "--sync", choices=("notion",), help="Explicitly sync the locally saved item to Notion"
+        "--sync", choices=("notion",),
+        help="Sync locally saved items to Notion; YouTube and TikTok videos use this policy by default",
     )
     doctor = subparsers.add_parser(
         "doctor", help="Check local platform runtimes and optional sync targets"
@@ -59,7 +60,13 @@ def main(argv: list[str] | None = None) -> int:
             if client is not None:
                 client.close()
     else:
-        results = ingest_urls(args.urls, args.output, force=args.force, sync=args.sync)
+        results = ingest_urls(
+            args.urls,
+            args.output,
+            force=args.force,
+            sync=args.sync,
+            auto_video_notion=args.sync is None,
+        )
         payload = {
             "ok": all(result["status"] != "failed" for result in results),
             "sync_ok": all(

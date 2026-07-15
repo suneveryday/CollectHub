@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "content-ingestor"
-version = "1.1.1"
+version = "1.1.2"
 description = "Local-first CollectHub ingestor for social content and public web pages"
 requires-python = ">=3.12"
 dependencies = [

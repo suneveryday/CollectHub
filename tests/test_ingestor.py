@@ -10,7 +10,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from content_ingestor.doctor import run_doctor, validate_cookie_file
-from content_ingestor.config import notion_token
+from content_ingestor.config import notion_data_source_id, notion_token
 from content_ingestor.notion import NotionError
 from content_ingestor.service import ingest_urls
 from content_ingestor.storage import find_local_item, safe_name, save_local_item
@@ -296,7 +296,9 @@ class IngestorTests(unittest.TestCase):
     def test_notion_token_reuses_private_hermes_env_only(self):
         with tempfile.TemporaryDirectory() as directory:
             env_file = Path(directory) / ".env"
-            env_file.write_text("NOTION_TOKEN=ntn_test\n")
+            env_file.write_text(
+                "NOTION_TOKEN=ntn_test\nCONTENT_OS_NOTION_DATA_SOURCE_ID=source_test\n"
+            )
             env_file.chmod(0o600)
             with patch.dict(
                 os.environ,
@@ -305,9 +307,12 @@ class IngestorTests(unittest.TestCase):
             ):
                 os.environ.pop("CONTENT_OS_NOTION_TOKEN", None)
                 os.environ.pop("NOTION_TOKEN", None)
+                os.environ.pop("CONTENT_OS_NOTION_DATA_SOURCE_ID", None)
                 self.assertEqual(notion_token(), "ntn_test")
+                self.assertEqual(notion_data_source_id(), "source_test")
                 env_file.chmod(0o644)
                 self.assertEqual(notion_token(), "")
+                self.assertEqual(notion_data_source_id(), "")
 
     def test_doctor_accepts_pinned_fake_runtime(self):
         with tempfile.TemporaryDirectory() as directory:
