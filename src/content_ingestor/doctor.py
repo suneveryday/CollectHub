@@ -8,10 +8,16 @@ from pathlib import Path
 
 from .config import (
     GALLERY_DL_VERSION,
+    DENO_VERSION,
+    TRAFILATURA_VERSION,
     XHS_COMMIT,
     XHS_VERSION,
     YT_DLP_VERSION,
+    YT_DLP_EJS_VERSION,
     cookie_file,
+    deno_binary,
+    media_runtime_home,
+    platform_cookie_file,
     x_runtime_home,
     x_python,
     xhs_home,
@@ -39,14 +45,25 @@ def run_doctor(*, sync: str | None = None) -> dict:
         )
     )
 
-    runtime = x_runtime_home()
+    runtime = media_runtime_home()
     xpy = x_python()
-    checks.append(_check("x_runtime_home", runtime.is_dir(), str(runtime)))
-    checks.append(_check("x_runtime_python", xpy.is_file() and os.access(xpy, os.X_OK), str(xpy)))
+    checks.append(_check("media_runtime_home", runtime.is_dir(), str(runtime)))
+    checks.append(_check("media_runtime_python", xpy.is_file() and os.access(xpy, os.X_OK), str(xpy)))
     gallery_version = _module_version(xpy, "gallery_dl") if xpy.is_file() else ""
     ytdlp_version = _module_version(xpy, "yt_dlp") if xpy.is_file() else ""
     checks.append(_check("gallery_dl_version", gallery_version == GALLERY_DL_VERSION, f"expected {GALLERY_DL_VERSION}, found {gallery_version or 'not installed'}"))
     checks.append(_check("yt_dlp_version", ytdlp_version == YT_DLP_VERSION, f"expected {YT_DLP_VERSION}, found {ytdlp_version or 'not installed'}"))
+    ejs_version = _package_version(xpy, "yt-dlp-ejs") if xpy.is_file() else ""
+    checks.append(_check("yt_dlp_ejs", ejs_version == YT_DLP_EJS_VERSION, f"expected {YT_DLP_EJS_VERSION}, found {ejs_version or 'not installed'}"))
+    deno = deno_binary()
+    deno_version = _binary_version(deno)
+    checks.append(_check("deno_version", deno_version == DENO_VERSION, f"expected {DENO_VERSION}, found {deno_version or 'not installed'}"))
+    try:
+        import trafilatura
+        parser_version = getattr(trafilatura, "__version__", "")
+    except ImportError:
+        parser_version = ""
+    checks.append(_check("trafilatura_version", parser_version == TRAFILATURA_VERSION, f"expected {TRAFILATURA_VERSION}, found {parser_version or 'not installed'}"))
 
     cookie = cookie_file()
     if cookie.exists():
@@ -54,6 +71,13 @@ def run_doctor(*, sync: str | None = None) -> dict:
         checks.append(_check("cookie_file", cookie_ok, detail))
     else:
         checks.append({"name": "cookie_file", "ok": True, "optional": True, "detail": f"not configured: {cookie}"})
+    for platform in ("youtube", "tiktok", "facebook", "zhihu"):
+        candidate = platform_cookie_file(platform)
+        if candidate.exists():
+            cookie_ok, detail = validate_cookie_file(candidate)
+            checks.append(_check(f"{platform}_cookie_file", cookie_ok, detail))
+        else:
+            checks.append({"name": f"{platform}_cookie_file", "ok": True, "optional": True, "detail": f"not configured: {candidate}"})
 
     if sync == "notion":
         client: NotionClient | None = None
@@ -78,7 +102,7 @@ def run_doctor(*, sync: str | None = None) -> dict:
     return {
         "ok": all(check["ok"] for check in checks),
         "xhs_version": XHS_VERSION,
-        "x_runtime": {"gallery-dl": GALLERY_DL_VERSION, "yt-dlp": YT_DLP_VERSION},
+        "media_runtime": {"gallery-dl": GALLERY_DL_VERSION, "yt-dlp": YT_DLP_VERSION, "deno": DENO_VERSION},
         "checks": checks,
     }
 
@@ -123,6 +147,23 @@ def _module_version(python: Path, module: str) -> str:
     except OSError:
         return ""
     return proc.stdout.strip().splitlines()[0] if proc.returncode == 0 and proc.stdout.strip() else ""
+
+
+def _package_version(python: Path, package: str) -> str:
+    try:
+        proc = subprocess.run([str(python), "-c", "import importlib.metadata as m,sys;print(m.version(sys.argv[1]))", package], text=True, capture_output=True, check=False, timeout=10)
+    except OSError:
+        return ""
+    return proc.stdout.strip() if proc.returncode == 0 else ""
+
+
+def _binary_version(binary: Path) -> str:
+    try:
+        proc = subprocess.run([str(binary), "--version"], text=True, capture_output=True, check=False, timeout=10)
+    except OSError:
+        return ""
+    match = proc.stdout.strip().split()
+    return match[1] if proc.returncode == 0 and len(match) > 1 else ""
 
 
 def _check(name: str, ok: bool, detail: str) -> dict:

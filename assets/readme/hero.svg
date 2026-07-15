@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="420" viewBox="0 0 1200 420" role="img" aria-labelledby="title desc">
   <title id="title">CollectHub</title>
-  <desc id="desc">把小红书和 X 的链接保存为本地可阅读、可搜索、可迁移的知识库。</desc>
+  <desc id="desc">把社交平台和网页链接保存为本地可阅读、可搜索、可迁移的知识库。</desc>
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#111827"/>
@@ -20,12 +20,12 @@
     <text x="0" y="80" fill="#f8fafc" font-size="72" font-weight="760" letter-spacing="-2">CollectHub</text>
     <rect x="0" y="104" width="54" height="5" rx="2.5" fill="#ffd166"/>
     <text x="0" y="154" fill="#e5edf7" font-size="28" font-weight="650">把平台收藏，变成真正属于你的内容。</text>
-    <text x="0" y="196" fill="#9fb0c5" font-size="18">发一个链接，保存正文、图片和视频。</text>
+    <text x="0" y="196" fill="#9fb0c5" font-size="18">发一个链接，保存正文、图片、封面和字幕。</text>
     <text x="0" y="226" fill="#9fb0c5" font-size="18">本地可读、可搜索、可迁移。</text>
 
     <g transform="translate(0 270)" font-size="14" font-weight="650">
       <rect width="90" height="34" rx="17" fill="#1e293b" stroke="#34455d"/>
-      <text x="45" y="22" fill="#e2e8f0" text-anchor="middle">小红书</text>
+      <text x="45" y="22" fill="#e2e8f0" text-anchor="middle">多平台</text>
       <rect x="102" width="56" height="34" rx="17" fill="#1e293b" stroke="#34455d"/>
       <text x="130" y="22" fill="#e2e8f0" text-anchor="middle">X</text>
       <rect x="170" width="76" height="34" rx="17" fill="#1e293b" stroke="#34455d"/>

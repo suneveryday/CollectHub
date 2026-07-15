@@ -4,11 +4,12 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "content-ingestor"
-version = "1.0.0"
-description = "Local-first CollectHub ingestor with deterministic Xiaohongshu and X routing"
+version = "1.1.0"
+description = "Local-first CollectHub ingestor for social content and public web pages"
 requires-python = ">=3.12"
 dependencies = [
     "httpx>=0.27,<1",
+    "trafilatura==2.1.0",
 ]
 
 [project.scripts]

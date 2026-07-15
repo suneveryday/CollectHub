@@ -1,0 +1,68 @@
+#!/bin/sh
+set -eu
+
+GALLERY_DL_VERSION=1.32.1
+YT_DLP_VERSION=2026.06.09
+YT_DLP_EJS_VERSION=0.8.0
+DENO_VERSION=2.8.1
+RUNTIME_VERSION="gallery-dl-$GALLERY_DL_VERSION"_"yt-dlp-$YT_DLP_VERSION"_"deno-$DENO_VERSION"
+TARGET="${COLLECTHUB_MEDIA_RUNTIME_HOME:-${CONTENT_OS_X_RUNTIME_HOME:-$HOME/.local/share/collecthub/runtimes/media/$RUNTIME_VERSION}}"
+STAMP=$(date +%Y%m%d-%H%M%S)
+
+case "$(uname -s)-$(uname -m)" in
+  Darwin-arm64)
+    DENO_ASSET=deno-aarch64-apple-darwin.zip
+    DENO_SHA256=8154e2de0ee8c1cae31fa88e078724aaef0295fab9fd2ad6f8520389cee908f6
+    ;;
+  Darwin-x86_64)
+    DENO_ASSET=deno-x86_64-apple-darwin.zip
+    DENO_SHA256=47473845e0522ba11dd279e3dd318e2d84ee200c56b8280594e0ae0b0f827460
+    ;;
+  *) echo "CollectHub media runtime supports macOS arm64/x86_64 only" >&2; exit 1 ;;
+esac
+
+echo "Dependencies: gallery-dl $GALLERY_DL_VERSION, yt-dlp[default,pin] $YT_DLP_VERSION, yt-dlp-ejs $YT_DLP_EJS_VERSION, Deno $DENO_VERSION"
+echo "Target: $TARGET"
+echo "Policy: metadata, thumbnails, and subtitles only for video platforms"
+
+if [ "${1:-}" != "--apply" ]; then
+  echo "Dry run only. Re-run with --apply to install."
+  exit 0
+fi
+
+command -v uv >/dev/null 2>&1 || { echo "uv is required" >&2; exit 1; }
+command -v unzip >/dev/null 2>&1 || { echo "unzip is required" >&2; exit 1; }
+PARENT=$(dirname "$TARGET")
+mkdir -p "$PARENT"
+TEMP=$(mktemp -d "$PARENT/.install-media-runtime-XXXXXX")
+cleanup() { rm -rf "$TEMP"; }
+trap cleanup EXIT INT TERM
+
+uv venv --python 3.12 "$TEMP/.venv"
+uv pip install --python "$TEMP/.venv/bin/python" \
+  "gallery-dl==$GALLERY_DL_VERSION" \
+  "yt-dlp[default,pin]==$YT_DLP_VERSION"
+
+DENO_ARCHIVE=$TEMP/$DENO_ASSET
+curl --proto '=https' --tlsv1.2 -fsSL \
+  "https://github.com/denoland/deno/releases/download/v$DENO_VERSION/$DENO_ASSET" \
+  -o "$DENO_ARCHIVE"
+printf '%s  %s\n' "$DENO_SHA256" "$DENO_ARCHIVE" | shasum -a 256 -c -
+mkdir -p "$TEMP/bin"
+unzip -q "$DENO_ARCHIVE" -d "$TEMP/bin"
+rm -f "$DENO_ARCHIVE"
+chmod 755 "$TEMP/bin/deno"
+
+[ "$("$TEMP/.venv/bin/python" -m gallery_dl --version)" = "$GALLERY_DL_VERSION" ]
+[ "$("$TEMP/.venv/bin/python" -m yt_dlp --version)" = "$YT_DLP_VERSION" ]
+"$TEMP/.venv/bin/python" -c "import importlib.metadata as m,sys; sys.exit(m.version('yt-dlp-ejs') != sys.argv[1])" "$YT_DLP_EJS_VERSION"
+[ "$("$TEMP/bin/deno" --version | awk 'NR==1 {print $2}')" = "$DENO_VERSION" ]
+
+if [ -e "$TARGET" ]; then
+  BACKUP="$TARGET.bak-$STAMP"
+  mv "$TARGET" "$BACKUP"
+  echo "Backup: $BACKUP"
+fi
+mv "$TEMP" "$TARGET"
+trap - EXIT INT TERM
+echo "Installed: $TARGET"

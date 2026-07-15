@@ -276,11 +276,11 @@ class IngestorTests(unittest.TestCase):
             urls,
         )
 
-    def test_rejects_non_xhs_url(self):
+    def test_rejects_non_http_and_local_urls(self):
         with tempfile.TemporaryDirectory() as directory:
             results = [
-                ingest_urls(["https://example.com/post"], Path(directory))[0],
-                ingest_urls(["https://evil.example/?next=xiaohongshu.com"], Path(directory))[0],
+                ingest_urls(["file:///tmp/private"], Path(directory))[0],
+                ingest_urls(["http://localhost/private"], Path(directory))[0],
             ]
         self.assertTrue(all(result["error"]["code"] == "unsupported_url" for result in results))
 
@@ -320,12 +320,16 @@ class IngestorTests(unittest.TestCase):
                 "content_ingestor.doctor._git_commit",
                 return_value="afaf2fb459980fccef9eec74e304a39af2c49cab",
             ), patch("content_ingestor.doctor.shutil.which", return_value="/usr/bin/uv"), patch(
-                "content_ingestor.doctor.x_runtime_home", return_value=home,
+                "content_ingestor.doctor.media_runtime_home", return_value=home,
             ), patch(
                 "content_ingestor.doctor.x_python", return_value=python,
             ), patch(
                 "content_ingestor.doctor._module_version",
                 side_effect=lambda _, module: "1.32.1" if module == "gallery_dl" else "2026.06.09",
+            ), patch(
+                "content_ingestor.doctor._package_version", return_value="0.8.0",
+            ), patch(
+                "content_ingestor.doctor._binary_version", return_value="2.8.1",
             ), patch(
                 "content_ingestor.doctor.NotionClient"
             ) as notion_client:

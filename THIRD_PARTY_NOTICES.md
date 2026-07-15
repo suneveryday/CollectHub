@@ -24,7 +24,32 @@ XHS-Downloader is downloaded from its upstream repository into the user's local 
 - Pinned release: 2026.06.09
 - License: Unlicense
 
-Both X tools are installed from their upstream Python distributions into an isolated user-local runtime and invoked as separate processes. They are not bundled into the MIT-licensed CollectHub repository or release archive.
+## yt-dlp-ejs
+
+- Project: yt-dlp/ejs
+- Source: https://github.com/yt-dlp/ejs
+- Pinned release: 0.8.0, selected by `yt-dlp[default,pin]` 2026.06.09
+- License: Unlicense; prebuilt wheels also contain ISC- and MIT-licensed components
+
+gallery-dl, yt-dlp, and yt-dlp-ejs are installed from their upstream Python distributions into an isolated user-local runtime and invoked by CollectHub without being copied into the MIT source archive.
+
+## Deno
+
+- Project: denoland/deno
+- Source: https://github.com/denoland/deno
+- Pinned release: 2.8.1
+- License: MIT
+
+The installer downloads the architecture-specific macOS archive and verifies its embedded upstream SHA-256 checksum. Deno is used only as yt-dlp's external JavaScript challenge runtime.
+
+## Trafilatura
+
+- Project: adbar/trafilatura
+- Source: https://github.com/adbar/trafilatura
+- Pinned release: 2.1.0
+- License: Apache-2.0
+
+Trafilatura and its locked transitive dependencies are installed in CollectHub's isolated Python environment. Their licenses remain independent from CollectHub's MIT license.
 
 ## uv
 

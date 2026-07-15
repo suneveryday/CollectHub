@@ -35,7 +35,7 @@ def ingest_urls(
                 raise AdapterError("unsupported_url", "no content adapter supports this URL") from exc
             cleanup = adapter.cleanup
             source_id, canonical_url = adapter.canonicalizer(url)
-            item = None if force else find_local_item(output, url)
+            item = None if force else (find_local_item(output, url) or find_local_item(output, canonical_url))
             if item is None:
                 payload = (reader or adapter.reader)(url)
                 item = adapter.normalizer(payload, url)
@@ -107,10 +107,21 @@ class SaveError(RuntimeError):
 
 
 def _validate_media(item: ContentItem) -> None:
-    supported_types = {"image", "video", "live_photo"} if item.platform == "xiaohongshu" else {"post", "long_post", "article"}
+    supported_types = {
+        "xiaohongshu": {"image", "video", "live_photo"},
+        "x": {"post", "long_post", "article"},
+        "zhihu": {"answer", "article", "post", "video"},
+        "youtube": {"video"},
+        "tiktok": {"post", "image", "video"},
+        "facebook": {"post", "image", "video"},
+        "web": {"webpage", "article"},
+    }.get(item.platform, set())
     if item.content_type not in supported_types:
         raise SaveError("type_detection", "content_type_unknown", "content type could not be determined")
-    if item.platform == "x":
+    if item.capture_policy == "metadata_subtitles":
+        # Video/audio absence is intentional. Images and subtitle sidecars are best effort.
+        return
+    if item.platform in {"x", "web", "zhihu", "facebook"}:
         if item.capture_status == "metadata_only" and not item.body and not item.article.get("plain_text"):
             return
         missing = [asset for asset in item.media if asset.status == "failed"]
@@ -152,7 +163,7 @@ def _failure(source_url: str, stage: str, code: str, message: str, local_path: s
 
 def _failed_x_item(source_id: str, canonical_url: str, input_url: str, capture_status: str) -> ContentItem:
     return ContentItem(
-        schema_version="2",
+        schema_version="3",
         platform="x",
         content_type="post",
         source_id=source_id,

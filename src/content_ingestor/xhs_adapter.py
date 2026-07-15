@@ -102,7 +102,7 @@ def normalize_xhs(payload: dict[str, Any], source_url: str) -> ContentItem:
 
     raw = {key: value for key, value in payload.items() if not key.startswith("_")}
     return ContentItem(
-        schema_version="1",
+        schema_version="3",
         platform="xiaohongshu",
         content_type=content_type,
         source_id=source_id,

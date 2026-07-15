@@ -16,7 +16,7 @@ def build_parser() -> argparse.ArgumentParser:
     ingest = subparsers.add_parser(
         "ingest", help="Route supported platform links into the local CollectHub library"
     )
-    ingest.add_argument("urls", nargs="+", help="One or more Xiaohongshu or X status URLs")
+    ingest.add_argument("urls", nargs="+", help="One or more supported single-content or public webpage URLs")
     ingest.add_argument("--output", type=Path, default=default_output())
     ingest.add_argument(
         "--force", action="store_true", help="Refresh the local item and any requested sync target"

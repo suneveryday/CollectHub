@@ -1,4 +1,5 @@
 interface:
   display_name: "CollectHub Content Ingestor"
-  short_description: "Save Xiaohongshu and X links to a private local library"
-  default_prompt: "Use $content-ingestor to save the provided social links locally, and sync to Notion only if I explicitly request it."
+  short_description: "Save social links and public webpages to a private local library"
+  default_prompt: "Use $content-ingestor to save these links locally, and sync to Notion only if I explicitly request it."
+  brand_color: "#2563EB"

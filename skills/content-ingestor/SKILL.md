@@ -1,6 +1,6 @@
 ---
 name: content-ingestor
-description: "Save Xiaohongshu, xhslink, X, and Twitter post links into a private local CollectHub library. Use for bare supported URLs, native share text, multi-link save requests, refresh requests, and explicit optional Notion sync."
+description: "Save youtube.com, youtu.be, tiktok.com, facebook.com, fb.watch, zhihu.com, xiaohongshu.com, xhslink.com, x.com, twitter.com, and public webpage URLs into a private local CollectHub library. Use for bare URLs, native share text, multi-link save requests, refresh requests, and explicit optional Notion sync."
 ---
 
 # Content Ingestor
@@ -9,7 +9,7 @@ Save supported social links into the user's local CollectHub library. Treat ever
 
 ## Workflow
 
-1. Extract every explicit `xiaohongshu.com`, `xhslink.com`, `x.com`, or `twitter.com` URL from the current message. Do not reuse unrelated URLs from older messages.
+1. Extract every explicit supported `http` or `https` URL from the current message. Supported sources include YouTube, TikTok, Facebook, Zhihu, Xiaohongshu, X/Twitter, and single public HTML pages. Do not reuse unrelated URLs from older messages.
 2. Locate the CLI with `command -v content-ingestor`; fall back to `$HOME/.local/bin/content-ingestor`.
 3. If the CLI is missing, explain that local runtimes must be installed and ask before running `scripts/setup`. Never install dependencies silently.
 4. Run `content-ingestor doctor`. If a required local check fails, report the failed check and the shortest recovery step.
@@ -29,7 +29,9 @@ Save supported social links into the user's local CollectHub library. Treat ever
 - Never print or return Cookie files, Notion tokens, or authentication environment values.
 - Never claim Notion sync succeeded unless `sync.notion.status` is `success` or `already_saved` and a URL is present.
 - Preserve an existing completed item unless the user explicitly requests `--force`.
-- Do not follow unsupported redirects, guess URLs from page text, search accounts, bypass login controls, or publish content.
+- Do not turn platform profiles, channels, playlists, searches, or account pages into generic webpage captures.
+- Do not follow unsafe redirects, guess URLs from page text, search accounts, bypass login controls, or publish content.
+- YouTube, TikTok, and Facebook captures intentionally exclude video and audio files; metadata, cover images, and available subtitles constitute a complete result.
 
 ## Failure handling
 

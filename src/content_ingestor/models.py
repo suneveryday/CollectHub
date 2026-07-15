@@ -37,6 +37,8 @@ class ContentItem:
     metrics: dict[str, Any] = field(default_factory=dict)
     article: dict[str, Any] = field(default_factory=dict)
     extractor_versions: dict[str, str] = field(default_factory=dict)
+    capture_policy: str = "full"
+    subtitles: list[dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

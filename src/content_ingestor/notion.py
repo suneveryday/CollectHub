@@ -18,6 +18,11 @@ SCHEMA: dict[str, dict[str, Any]] = {
     "平台": {"select": {"options": [
         {"name": "小红书", "color": "red"},
         {"name": "X", "color": "blue"},
+        {"name": "知乎", "color": "blue"},
+        {"name": "YouTube", "color": "red"},
+        {"name": "TikTok", "color": "pink"},
+        {"name": "Facebook", "color": "blue"},
+        {"name": "网页", "color": "gray"},
     ]}},
     "内容类型": {
         "select": {
@@ -28,6 +33,8 @@ SCHEMA: dict[str, dict[str, Any]] = {
                 {"name": "普通帖子", "color": "gray"},
                 {"name": "Long Post", "color": "blue"},
                 {"name": "Article", "color": "green"},
+                {"name": "回答", "color": "blue"},
+                {"name": "网页", "color": "gray"},
             ]
         }
     },
@@ -732,11 +739,12 @@ def _type_label(content_type: str) -> str:
     return {
         "image": "图文", "video": "视频", "live_photo": "Live Photo",
         "post": "普通帖子", "long_post": "Long Post", "article": "Article",
+        "answer": "回答", "webpage": "网页",
     }.get(content_type, content_type)
 
 
 def _platform_label(platform: str) -> str:
-    return {"xiaohongshu": "小红书", "x": "X"}.get(platform, platform)
+    return {"xiaohongshu": "小红书", "x": "X", "zhihu": "知乎", "youtube": "YouTube", "tiktok": "TikTok", "facebook": "Facebook", "web": "网页"}.get(platform, platform)
 
 
 def _page_url(page_id: str) -> str:

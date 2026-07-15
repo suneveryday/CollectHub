@@ -126,7 +126,7 @@ def normalize_x(payload: dict[str, Any], input_url: str) -> ContentItem:
         "updated_at": _iso_date(article.get("date_updated")),
     }
     return ContentItem(
-        schema_version="2",
+        schema_version="3",
         platform="x",
         content_type=content_type,
         source_id=tweet_id,

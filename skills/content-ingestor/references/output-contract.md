@@ -10,7 +10,9 @@ Each item contains:
 
 - `index.md`: readable source attribution, body, tags, and relative media links.
 - `metadata.json`: normalized model, extractor versions, ingest status, and non-secret errors.
-- `assets/`: downloaded images, video, audio, and Live Photo motion files when present.
+- `assets/`: downloaded images, covers, subtitle sidecars, and source-allowed media when present.
+
+Schema v3 adds `capture_policy` and structured `subtitles`. Video platforms use `metadata_subtitles`: missing video/audio files are intentional, and a source with no available subtitles can still be complete.
 
 Top-level statuses:
 

@@ -41,6 +41,8 @@ def save_local_item(item: ContentItem, output: Path, *, force: bool = False) -> 
                     prefix = "audio"
                 elif asset.kind == "live":
                     prefix = f"live-{index:03d}"
+                elif asset.kind == "subtitle":
+                    prefix = f"subtitle-{index:03d}"
                 else:
                     prefix = f"{index:03d}"
                 filename = f"{prefix}{extension}"
@@ -51,6 +53,12 @@ def save_local_item(item: ContentItem, output: Path, *, force: bool = False) -> 
                 asset.status = "failed"
                 asset.error = str(exc)
                 failures.append(f"{asset.kind}: {exc}")
+
+        subtitle_assets = [asset for asset in item.media if asset.kind == "subtitle"]
+        for index, subtitle in enumerate(item.subtitles):
+            if index < len(subtitle_assets):
+                subtitle["filename"] = subtitle_assets[index].filename
+                subtitle["status"] = subtitle_assets[index].status
 
         status = "partial" if item.capture_status in {"media_partial", "metadata_only"} else "success"
         required_kinds = _required_kinds(item.platform, item.content_type, item.media)
@@ -150,6 +158,10 @@ def _markdown(item: ContentItem, status: str, errors: list[str]) -> str:
     if saved_audio:
         lines.extend(["", "## 音频", ""])
         lines.extend(f"[本地音频文件 {index}]({asset.filename})" for index, asset in enumerate(saved_audio, 1))
+    saved_subtitles = [asset for asset in item.media if asset.kind == "subtitle" and asset.filename]
+    if saved_subtitles:
+        lines.extend(["", "## 字幕文件", ""])
+        lines.extend(f"[字幕 {index}]({asset.filename})" for index, asset in enumerate(saved_subtitles, 1))
     if item.tags:
         lines.extend(["", "## 标签", "", " ".join(f"#{tag}" for tag in item.tags)])
     if errors:
@@ -176,11 +188,12 @@ def _type_label(content_type: str) -> str:
     return {
         "image": "图文", "video": "视频", "live_photo": "Live Photo",
         "post": "普通帖子", "long_post": "Long Post", "article": "Article",
+        "answer": "回答", "webpage": "网页",
     }.get(content_type, content_type)
 
 
 def _platform_label(platform: str) -> str:
-    return {"xiaohongshu": "小红书", "x": "X"}.get(platform, platform)
+    return {"xiaohongshu": "小红书", "x": "X", "zhihu": "知乎", "youtube": "YouTube", "tiktok": "TikTok", "facebook": "Facebook", "web": "网页"}.get(platform, platform)
 
 
 def _existing_local_complete(target: Path, content_type: str) -> bool:
@@ -228,12 +241,30 @@ def _source_id_from_url(value: str) -> str:
             return parts[index + 1] if parts[index + 1].isdigit() else ""
         except (ValueError, IndexError):
             return ""
+    if hostname in {"youtu.be", "www.youtu.be"} and len(parts) == 1:
+        return parts[0]
+    if hostname.endswith("youtube.com"):
+        from urllib.parse import parse_qs
+        if parts and parts[0] in {"shorts", "live", "embed"} and len(parts) > 1:
+            return parts[1]
+        return parse_qs(urlparse(value).query).get("v", [""])[0]
+    for marker in ("video", "photo", "reel", "videos", "posts", "answer", "p", "pin", "zvideo"):
+        try:
+            index = parts.index(marker)
+            candidate = parts[index + 1]
+            if candidate:
+                return candidate
+        except (ValueError, IndexError):
+            continue
     return ""
 
 
 def _required_kinds(platform: str, content_type: str, media: list[MediaAsset] | list[dict]) -> set[str]:
     if platform == "xiaohongshu":
         return {"video"} if content_type == "video" else {"live"} if content_type == "live_photo" else set()
+    # YouTube/TikTok/Facebook/Zhihu video capture intentionally omits audio/video.
+    if platform in {"youtube", "tiktok", "facebook", "zhihu", "web"}:
+        return set()
     kinds = {
         str(asset.kind if isinstance(asset, MediaAsset) else asset.get("kind", ""))
         for asset in media

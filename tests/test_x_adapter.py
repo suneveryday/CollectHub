@@ -186,11 +186,12 @@ class XAdapterTests(unittest.TestCase):
             self.assertTrue(any(output.rglob("metadata.json")))
             self.assertEqual(len(list((Path(result["local_path"]) / "assets").iterdir())), 1)
 
-    def test_router_supports_xhs_x_and_rejects_unknown_hosts(self):
+    def test_router_supports_known_platforms_and_generic_web(self):
         self.assertEqual(adapter_for("https://www.xiaohongshu.com/explore/abc").name, "xiaohongshu")
         self.assertEqual(adapter_for("https://x.com/a/status/1900000000000000001").name, "x")
+        self.assertEqual(adapter_for("https://example.com/post").name, "web")
         with self.assertRaises(ValueError):
-            adapter_for("https://example.com/post")
+            adapter_for("file:///tmp/private")
 
     def test_mixed_platform_batch_routes_each_url_independently(self):
         def reader(url: str):
