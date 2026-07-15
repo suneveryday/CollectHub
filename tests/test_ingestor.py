@@ -368,6 +368,9 @@ class IngestorTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             home = Path(directory) / "home"
             env = {**os.environ, "HOME": str(home)}
+            legacy_skill = home / ".hermes/skills/social-media/content-ingestor"
+            legacy_skill.mkdir(parents=True)
+            (legacy_skill / "SKILL.md").write_text("legacy skill", encoding="utf-8")
             install = [
                 str(ROOT / "install.sh"), "--yes", "--client", "all",
                 "--source", str(ROOT), "--skip-runtimes",
@@ -377,6 +380,14 @@ class IngestorTests(unittest.TestCase):
             self.assertEqual((first.returncode, second.returncode), (0, 0))
             self.assertTrue((home / ".codex/skills/content-ingestor/SKILL.md").is_file())
             self.assertTrue((home / ".hermes/skills/content-ingestor/SKILL.md").is_file())
+            self.assertFalse(legacy_skill.exists())
+            legacy_backups = list(
+                (home / ".local/share/collecthub/backups/skills/hermes").glob(
+                    "content-ingestor-legacy-*/SKILL.md"
+                )
+            )
+            self.assertEqual(len(legacy_backups), 1)
+            self.assertEqual(legacy_backups[0].read_text(encoding="utf-8"), "legacy skill")
             self.assertTrue((home / ".local/bin/content-ingestor").is_file())
             remove = subprocess.run(
                 [str(ROOT / "install.sh"), "--yes", "--client", "all", "--uninstall"],

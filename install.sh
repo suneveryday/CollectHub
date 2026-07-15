@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-VERSION=1.1.0
+VERSION=1.1.1
 UV_VERSION=0.11.7
 REPOSITORY=suneveryday/CollectHub
 CLIENT=auto
@@ -89,12 +89,21 @@ skill_target() {
   esac
 }
 
+legacy_hermes_skill_target() {
+  echo "${HERMES_HOME:-$HOME/.hermes}/skills/social-media/content-ingestor"
+}
+
 echo "CollectHub v$VERSION"
 echo "Application: $RELEASE_DIR"
 echo "CLI: $CLI"
 echo "Library: ${COLLECTHUB_LIBRARY:-$HOME/CollectHub}"
 echo "Clients:"
-clients | while IFS= read -r item; do echo "  $item -> $(skill_target "$item")"; done
+clients | while IFS= read -r item; do
+  echo "  $item -> $(skill_target "$item")"
+  if [ "$item" = hermes ] && [ -e "$(legacy_hermes_skill_target)" ]; then
+    echo "    legacy skill -> backup outside the scanned skill tree"
+  fi
+done
 
 if [ "$UNINSTALL" -eq 1 ]; then
   echo "Action: uninstall application and managed skills; preserve the local library"
@@ -233,6 +242,14 @@ chmod 755 "$CLI"
 
 clients | while IFS= read -r item; do
   target=$(skill_target "$item")
+  if [ "$item" = hermes ]; then
+    legacy_target=$(legacy_hermes_skill_target)
+    if [ -e "$legacy_target" ] && [ "$legacy_target" != "$target" ]; then
+      mkdir -p "$BACKUPS/skills/$item"
+      mv "$legacy_target" "$BACKUPS/skills/$item/content-ingestor-legacy-$STAMP"
+      echo "Backed up legacy Hermes skill: $legacy_target"
+    fi
+  fi
   if [ -e "$target" ]; then
     mkdir -p "$BACKUPS/skills/$item"
     mv "$target" "$BACKUPS/skills/$item/content-ingestor-$STAMP"
@@ -245,4 +262,4 @@ done
 
 echo "Installed CollectHub v$VERSION"
 echo "Run: $CLI doctor"
-echo "Restart Codex or start a new Hermes session to load the skill."
+echo "Restart Codex or restart the Hermes Gateway to load the skill."
