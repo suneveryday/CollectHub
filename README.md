@@ -1,121 +1,142 @@
-# CollectHub
+<p align="center">
+  <img src="./assets/readme/hero.svg" width="100%" alt="CollectHub：把小红书和 X 的链接保存为本地可阅读、可搜索、可迁移的知识库。">
+</p>
 
-CollectHub 是一个本地优先的 Agent Skill：把小红书和 X/Twitter 单条内容保存为可长期阅读、迁移和检索的 Markdown、JSON 与媒体文件。首版正式支持 macOS 上的 Codex 和 Hermes。
+<p align="center">
+  <strong>不再把重要内容寄存在平台收藏夹里。</strong><br>
+  将链接发给 Codex 或 Hermes，正文、图片和视频会整理成真正属于你的本地文件。
+</p>
 
-## 一行安装
+<p align="center">
+  <a href="#快速开始">快速开始</a> ·
+  <a href="#支持范围">支持范围</a> ·
+  <a href="#notion同步">Notion 同步</a> ·
+  <a href="#常用管理命令">管理命令</a>
+</p>
 
-安装固定版本 `v1.0.0`：
+## 01 · 收藏不是拥有
+
+平台收藏适合“先放进去”，却不适合长期管理。内容散落在不同应用里，回头难找，原帖还可能删除、隐藏或受登录状态限制；想换一个知识管理工具时，也很难完整带走。
+
+CollectHub 把已经成功保存的内容变成普通的 Markdown、JSON 和媒体文件。你可以直接阅读、全文搜索、备份到硬盘，或交给其他工具继续处理。
+
+<p align="center">
+  <img src="./assets/readme/from-bookmarks-to-library.svg" width="100%" alt="使用 CollectHub 前，收藏散落在平台中；使用后，内容在本地统一归档，可以阅读、搜索、备份和迁移。">
+</p>
+
+## 02 · 发一个链接，留下完整内容
+
+- **一句话收藏**：把小红书或 X 链接直接发给 Agent，无需复制正文、下载图片或整理文件名。
+- **尽量完整保留**：支持正文、图片、视频、Live Photo、X Long Post 和 Article。
+- **真正本地拥有**：内容默认进入 `~/CollectHub`，不依赖某个云端服务才能打开。
+- **自动整理与去重**：按年月和平台归档；重复链接不会制造多份副本。
+- **批量也不中断**：一条消息可以包含多个链接，某一条失败不会影响后面的内容。
+- **Notion 完全可选**：本地保存始终是主结果，需要时再显式同步到 Notion。
+
+直接把链接或平台分享文本发给 Agent：
+
+```text
+帮我保存 https://www.xiaohongshu.com/explore/NOTE_ID
+```
+
+```text
+收藏 https://x.com/username/status/TWEET_ID
+```
+
+一条消息可以包含多个链接。某一条失败，不会阻断后面的内容。
+
+<a id="快速开始"></a>
+
+## 03 · 一分钟开始使用
+
+CollectHub 首版支持 macOS（Apple Silicon 和 Intel），可安装到 Codex、Hermes 或两者。
 
 ```bash
 curl --proto '=https' --tlsv1.2 -fsSL \
   https://raw.githubusercontent.com/suneveryday/CollectHub/v1.0.0/install.sh | sh
 ```
 
-安装器会先显示写入位置、依赖和许可证，确认后在用户目录安装：
+安装器会先说明将要安装的内容和写入位置，得到确认后才会继续。它使用独立运行环境，不会修改系统 Python。
 
-- CollectHub：`~/.local/share/collecthub/releases/1.0.0`
-- CLI：`~/.local/bin/content-ingestor`
-- Skill：自动检测 `~/.codex/skills/`、`~/.hermes/skills/` 或两者
-- 本地内容库：`~/CollectHub`
+安装完成后，重启 Codex 或开启新的 Hermes 会话，然后发送链接即可。裸链接、小红书分享文本和同时包含多个链接的消息都可以直接处理。
 
-同时安装固定版本的隔离 Python 3.12、XHS-Downloader 2.7、gallery-dl 1.32.1 和 yt-dlp 2026.06.09，不修改系统 Python。仅支持 macOS arm64 和 x86_64。
+## 04 · 内容留在本地
 
-非交互安装、预览、修复与卸载：
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/suneveryday/CollectHub/v1.0.0/install.sh | sh -s -- --yes
-curl -fsSL https://raw.githubusercontent.com/suneveryday/CollectHub/v1.0.0/install.sh | sh -s -- --dry-run
-curl -fsSL https://raw.githubusercontent.com/suneveryday/CollectHub/v1.0.0/install.sh | sh -s -- --yes --repair
-curl -fsSL https://raw.githubusercontent.com/suneveryday/CollectHub/v1.0.0/install.sh | sh -s -- --yes --uninstall
-```
-
-卸载不会删除 `~/CollectHub`。现有 Skill 和旧版本会先移到非扫描备份目录。
-
-## 使用
-
-重启 Codex 或开启新的 Hermes 会话，然后直接发送支持的链接，例如：
+所有内容默认保存在 `~/CollectHub`：
 
 ```text
-帮我保存 https://www.xiaohongshu.com/explore/NOTE_ID
-收藏 https://x.com/username/status/TWEET_ID
+~/CollectHub/
+└── 2026/07/xiaohongshu/一篇值得收藏的内容--CONTENT_ID/
+    ├── index.md       # 适合阅读和搜索的正文
+    ├── metadata.json  # 来源、作者和保存信息
+    └── assets/        # 图片、视频等原始媒体
 ```
 
-裸链接和原生分享文本都会触发保存。一次消息可包含多个链接，按出现顺序串行处理；单条失败不会阻断后续内容。
+这些都是普通文件。你可以用 Finder 打开、用 Spotlight 或其他工具搜索，也可以按自己的方式同步和备份。
 
-也可以直接使用 CLI：
+## 支持范围
 
-```bash
-~/.local/bin/content-ingestor doctor
-~/.local/bin/content-ingestor ingest \
-  'https://www.xiaohongshu.com/explore/NOTE_ID' \
-  'https://x.com/username/status/TWEET_ID'
-```
+| | 当前支持 |
+|---|---|
+| 内容平台 | 小红书、X / Twitter |
+| 内容类型 | 文字、图片、视频、Live Photo、长帖、Article |
+| Agent | Codex、Hermes |
+| 操作系统 | macOS arm64、macOS x86_64 |
+| 保存位置 | 本地目录；可选 Notion |
 
-默认输出可通过参数或环境变量修改：
+CollectHub 专注于保存你提供的单条内容链接，不提供账号批量抓取、平台搜索、登录绕过、AI 摘要、评论或内容发布。
 
-```bash
-content-ingestor ingest '<URL>' --output "$HOME/MyLibrary"
-export COLLECTHUB_LIBRARY="$HOME/MyLibrary"
-```
+<a id="notion同步"></a>
 
-只有明确需要刷新已有内容时才使用 `--force`。
+## 可选：同步到 Notion
 
-## 本地文件
-
-每条内容保存在：
-
-```text
-~/CollectHub/YYYY/MM/<platform>/<title>--<content-id>/
-├── index.md
-├── metadata.json
-└── assets/            # 有媒体时创建
-```
-
-状态包括 `success`、`partial`、`already_saved` 和 `failed`。成功、部分成功及已存在结果都返回绝对 `local_path`。
-
-## 可选 Notion 同步
-
-Notion 默认关闭，且仓库不包含任何个人 data source ID。先在本地安全配置：
-
-```bash
-export CONTENT_OS_NOTION_TOKEN='ntn_...'
-export CONTENT_OS_NOTION_DATA_SOURCE_ID='your_data_source_id'
-content-ingestor notion-schema
-content-ingestor notion-schema --apply
-content-ingestor doctor --sync notion
-```
-
-只有显式添加 `--sync notion` 才会同步：
+Notion 默认关闭。完成本地配置后，在请求中明确说“同步到 Notion”，或使用：
 
 ```bash
 content-ingestor ingest '<URL>' --sync notion
 ```
 
-Notion 同步失败不会删除本地内容，也不会把本地成功改成失败。不要把 Token 或 Cookie 发到聊天、命令参数或仓库中。
+即使 Notion 同步失败，本地文件仍然会保留。仓库不包含任何个人 Notion 数据库 ID、Token 或 Cookie。
 
-## 小红书 Cookie
+<details id="常用管理命令">
+<summary><strong>常用管理命令</strong></summary>
 
-公开内容通常无需 Cookie。确有需要时，用本地编辑器写入受限文件：
-
-```bash
-mkdir -p ~/.config/content-os
-chmod 700 ~/.config/content-os
-# 使用本地编辑器写入 ~/.config/content-os/xhs-cookie.txt
-chmod 600 ~/.config/content-os/xhs-cookie.txt
-```
-
-程序只在一次性下载进程中读取该文件，不会把内容写入日志、Markdown 或 metadata。CollectHub 不提供登录绕过、账号搜索、批量监控、评论或发布能力。
-
-## 从源码开发
+检查安装：
 
 ```bash
-uv sync --locked --python 3.12
-uv run python -m unittest discover -s tests -v
-./install.sh --dry-run --source "$PWD"
+content-ingestor doctor
 ```
 
-Skill 位于 `skills/content-ingestor`，遵循 [Agent Skills](https://agentskills.io) 目录规范。Codex 用户也可通过 Skill Installer 安装该 GitHub 目录；Hermes 用户可运行 `hermes skills install suneveryday/CollectHub/skills/content-ingestor`，随后首次使用时按提示运行 Skill 内的 setup 脚本安装本地运行时。
+预览安装内容：
 
-## 许可证与第三方组件
+```bash
+curl -fsSL https://raw.githubusercontent.com/suneveryday/CollectHub/v1.0.0/install.sh | sh -s -- --dry-run
+```
 
-CollectHub 使用 [MIT License](LICENSE)。下载器和运行时作为独立程序安装并通过子进程调用，不复制进本仓库；其许可证与固定版本见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。用户应遵守来源平台条款及适用法律，仅保存自己有权访问和使用的内容。
+修复安装：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/suneveryday/CollectHub/v1.0.0/install.sh | sh -s -- --yes --repair
+```
+
+卸载程序：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/suneveryday/CollectHub/v1.0.0/install.sh | sh -s -- --yes --uninstall
+```
+
+卸载不会删除 `~/CollectHub` 中已经保存的内容。
+
+</details>
+
+## 隐私与使用说明
+
+Cookie 和 Notion Token 只应保存在权限受限的本地文件或环境变量中，不要将它们发送到聊天或提交到仓库。CollectHub 不会把凭据写入收藏内容、日志或元数据。
+
+请只保存自己有权访问和使用的内容，并遵守来源平台条款及适用法律。
+
+## 开发与许可证
+
+Skill 位于 [`skills/content-ingestor`](skills/content-ingestor)，遵循 [Agent Skills](https://agentskills.io) 开放规范。
+
+CollectHub 使用 [MIT License](LICENSE)。第三方下载器作为独立程序安装和运行，详细许可信息见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
