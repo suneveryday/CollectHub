@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import html
 import re
 import json
 import tempfile
@@ -60,6 +61,24 @@ def facebook_identity(url: str) -> tuple[str, str]:
     return candidate or _hash_id(normalized), normalized
 
 
+def reddit_identity(url: str) -> tuple[str, str]:
+    normalized = normalize_public_url(url)
+    parsed = urlsplit(normalized)
+    host = (parsed.hostname or "").lower()
+    parts = [part for part in parsed.path.split("/") if part]
+    if host in {"redd.it", "www.redd.it"} and len(parts) == 1 and re.fullmatch(r"[A-Za-z0-9]+", parts[0]):
+        source_id = parts[0].lower()
+        return source_id, f"https://redd.it/{source_id}"
+    match = re.fullmatch(
+        r"/(?:r/[^/]+/|user/[^/]+/)?comments/([A-Za-z0-9]+)(?:/[^/]+)?/?",
+        parsed.path,
+    )
+    if not match:
+        raise AdapterError("unsupported_url", "Reddit URL must identify one post; communities, users, and feeds are not supported")
+    source_id = match.group(1).lower()
+    return source_id, f"https://www.reddit.com{parsed.path.rstrip('/')}"
+
+
 def zhihu_identity(url: str) -> tuple[str, str]:
     normalized = normalize_public_url(url)
     path = urlsplit(normalized).path
@@ -78,7 +97,17 @@ def zhihu_identity(url: str) -> tuple[str, str]:
 
 def read_youtube(url: str) -> dict[str, Any]:
     _, canonical = youtube_identity(url)
-    return read_media(canonical, "youtube")
+    try:
+        return read_media(canonical, "youtube")
+    except AdapterError as media_error:
+        try:
+            return _read_oembed(
+                "https://www.youtube.com/oembed?" + urlencode({"url": canonical, "format": "json"}),
+                canonical,
+                "youtube",
+            )
+        except AdapterError:
+            raise media_error
 
 
 def read_tiktok(url: str) -> dict[str, Any]:
@@ -114,6 +143,40 @@ def read_facebook(url: str) -> dict[str, Any]:
             raise media_error
 
 
+def read_reddit(url: str) -> dict[str, Any]:
+    _, canonical = reddit_identity(url)
+    try:
+        payload = _read_reddit_json(canonical)
+    except AdapterError as json_error:
+        if json_error.code == "invalid_parser_output":
+            raise
+        try:
+            return read_media(canonical, "reddit")
+        except AdapterError as media_error:
+            try:
+                return _read_oembed(
+                    "https://www.reddit.com/oembed?" + urlencode({"url": canonical}),
+                    canonical,
+                    "reddit",
+                )
+            except AdapterError:
+                try:
+                    page = read_web(canonical, platform="reddit")
+                    page["_reddit_error"] = json_error.code
+                    return page
+                except AdapterError:
+                    raise media_error
+    if payload.get("content_type") == "video":
+        try:
+            media = read_media(canonical, "reddit")
+            payload["files"] = list(payload.get("files") or []) + list(media.get("files") or [])
+            payload["info"] = {**(media.get("info") or {}), **(payload.get("info") or {})}
+            payload["_staging_dirs"] = [payload.get("_staging_dir"), media.get("_staging_dir")]
+        except AdapterError:
+            pass
+    return payload
+
+
 def read_zhihu(url: str) -> dict[str, Any]:
     _, canonical = zhihu_identity(url)
     if "/zvideo/" in urlsplit(canonical).path:
@@ -137,11 +200,44 @@ def normalize_facebook(payload: dict[str, Any], input_url: str) -> ContentItem:
     if "html" in payload:
         item = normalize_web(payload, input_url)
         item.platform, item.source_id, item.source_url, item.canonical_url = "facebook", source_id, canonical, canonical
-        item.content_type = "post"
+        path = urlsplit(canonical).path
+        item.content_type = "video" if any(token in path for token in ("/reel/", "/videos/", "/video.php", "/watch")) else "post"
         return item
     path = urlsplit(canonical).path
     content_type = "video" if any(token in path for token in ("/reel/", "/videos/", "/video.php", "/watch")) else "post"
     return _normalize_media(payload, input_url, "facebook", source_id, canonical, content_type)
+
+
+def normalize_reddit(payload: dict[str, Any], input_url: str) -> ContentItem:
+    source_id, canonical = reddit_identity(input_url)
+    if "html" in payload:
+        item = normalize_web(payload, input_url)
+        item.platform, item.source_id, item.source_url, item.canonical_url = "reddit", source_id, canonical, canonical
+        item.content_type = "post"
+        return item
+    content_type = str(payload.get("content_type") or "video")
+    item = _normalize_media(payload, input_url, "reddit", source_id, canonical, content_type)
+    item.source_url = item.canonical_url = canonical
+    reddit = payload.get("reddit") if isinstance(payload.get("reddit"), dict) else {}
+    community = str(reddit.get("community") or "")
+    item.tags = [community] if community else []
+    item.metrics = {
+        key: value for key, value in {
+            "score": reddit.get("score"),
+            "upvote_ratio": reddit.get("upvote_ratio"),
+            "comment_count": reddit.get("comment_count"),
+        }.items() if value is not None
+    }
+    item.raw.update({
+        "community": community,
+        "external_url": str(reddit.get("external_url") or ""),
+        "is_self": bool(reddit.get("is_self")),
+    })
+    if content_type != "video":
+        item.capture_policy = "public_json"
+        if content_type == "image" and not any(asset.kind == "image" for asset in item.media):
+            item.capture_status = "media_partial"
+    return item
 
 
 def normalize_zhihu(payload: dict[str, Any], input_url: str) -> ContentItem:
@@ -162,7 +258,13 @@ def cleanup_hybrid(payload: dict[str, Any]) -> None:
 def _normalize_media(payload: dict[str, Any], input_url: str, platform: str, source_id: str, canonical: str, fallback_type: str) -> ContentItem:
     info = payload.get("info") if isinstance(payload.get("info"), dict) else {}
     actual_id = str(info.get("id") or source_id)
-    webpage = str(info.get("webpage_url") or canonical)
+    webpage = canonical
+    extracted_webpage = str(info.get("webpage_url") or "")
+    if extracted_webpage and platform in {"tiktok", "facebook"}:
+        try:
+            _, webpage = tiktok_identity(extracted_webpage) if platform == "tiktok" else facebook_identity(extracted_webpage)
+        except AdapterError:
+            pass
     files = payload.get("files") if isinstance(payload.get("files"), list) else []
     media: list[MediaAsset] = []
     subtitles: list[dict[str, Any]] = []
@@ -220,6 +322,9 @@ def _read_tiktok_oembed(url: str) -> dict[str, Any]:
         raise AdapterError("invalid_parser_output", "TikTok oEmbed returned invalid JSON") from exc
     if not isinstance(data, dict) or not data.get("embed_product_id"):
         raise AdapterError("content_not_found", "TikTok oEmbed returned no public post metadata")
+    embed_id = str(data["embed_product_id"])
+    if not re.fullmatch(r"\d+", embed_id):
+        raise AdapterError("invalid_parser_output", "TikTok oEmbed returned an invalid post ID")
     staging = Path(tempfile.mkdtemp(prefix="collecthub-tiktok-oembed-"))
     files: list[dict[str, str]] = []
     thumbnail_url = str(data.get("thumbnail_url") or "")
@@ -227,16 +332,155 @@ def _read_tiktok_oembed(url: str) -> dict[str, Any]:
         try:
             thumbnail = fetch_image(thumbnail_url)
             suffix = {"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp"}.get(thumbnail.content_type, ".img")
-            path = staging / f"{data['embed_product_id']}{suffix}"
+            path = staging / f"{embed_id}{suffix}"
             path.write_bytes(thumbnail.content)
             files.append({"path": str(path), "kind": "image"})
         except AdapterError:
             pass
-    return {
+    payload = {
         "info": {
-            "id": str(data["embed_product_id"]), "title": str(data.get("title") or ""),
+            "id": embed_id, "title": str(data.get("title") or ""),
             "description": str(data.get("title") or ""), "uploader": str(data.get("author_name") or ""),
             "webpage_url": url,
         },
         "gallery": [], "files": files, "_staging_dir": str(staging), "oembed": True,
     }
+    return payload
+
+
+def _read_reddit_json(canonical: str) -> dict[str, Any]:
+    response = fetch_json(
+        canonical + ".json?raw_json=1",
+        headers={"Accept": "application/json", "User-Agent": "CollectHub/1.2 (+https://github.com/suneveryday/CollectHub)"},
+    )
+    try:
+        data = json.loads(response.content)
+        post = data[0]["data"]["children"][0]["data"]
+    except (ValueError, TypeError, KeyError, IndexError) as exc:
+        raise AdapterError("invalid_parser_output", "Reddit returned invalid public post JSON") from exc
+    if not isinstance(post, dict) or not post.get("id"):
+        raise AdapterError("content_not_found", "Reddit returned no public post")
+    expected_id = reddit_identity(canonical)[0]
+    source_id = str(post["id"]).lower()
+    if not re.fullmatch(r"[a-z0-9]+", source_id) or source_id != expected_id:
+        raise AdapterError("invalid_parser_output", "Reddit returned a mismatched post ID")
+    title = str(post.get("title") or f"Reddit post {source_id}").strip()
+    body = str(post.get("selftext") or "").strip()
+    author = str(post.get("author") or "")
+    if author == "[deleted]" and not body:
+        raise AdapterError("deleted_or_private", "the Reddit post is deleted or unavailable")
+    staging = Path(tempfile.mkdtemp(prefix="collecthub-reddit-"))
+    image_urls = _reddit_image_urls(post)
+    files: list[dict[str, str]] = []
+    total = 0
+    for index, image_url in enumerate(image_urls[:20], 1):
+        try:
+            image = fetch_image(image_url)
+            if total + len(image.content) > 100 * 1024 * 1024:
+                break
+            total += len(image.content)
+            suffix = {"image/jpeg": ".jpg", "image/png": ".png", "image/gif": ".gif", "image/webp": ".webp", "image/avif": ".avif"}.get(image.content_type)
+            if not suffix:
+                continue
+            path = staging / f"{source_id}-{index:03d}{suffix}"
+            path.write_bytes(image.content)
+            files.append({"path": str(path), "kind": "image"})
+        except AdapterError:
+            continue
+    reddit_video = post.get("secure_media", {}).get("reddit_video", {}) if isinstance(post.get("secure_media"), dict) else {}
+    is_video = bool(post.get("is_video") or reddit_video)
+    content_type = "video" if is_video else "image" if image_urls or post.get("is_gallery") or post.get("post_hint") == "image" else "post"
+    created = post.get("created_utc")
+    external_url = str(post.get("url_overridden_by_dest") or post.get("url") or "")
+    if external_url.startswith(("https://www.reddit.com/", "https://reddit.com/")):
+        external_url = ""
+    payload: dict[str, Any] = {
+        "info": {
+            "id": source_id,
+            "title": title,
+            "description": body,
+            "uploader": author,
+            "timestamp": created,
+            "webpage_url": canonical,
+            "duration": reddit_video.get("duration") if isinstance(reddit_video, dict) else None,
+        },
+        "reddit": {
+            "community": str(post.get("subreddit_name_prefixed") or ""),
+            "score": post.get("score"),
+            "upvote_ratio": post.get("upvote_ratio"),
+            "comment_count": post.get("num_comments"),
+            "external_url": external_url,
+            "is_self": bool(post.get("is_self")),
+        },
+        "content_type": content_type,
+        "files": files,
+        "_staging_dir": str(staging),
+    }
+    return payload
+
+
+def _reddit_image_urls(post: dict[str, Any]) -> list[str]:
+    result: list[str] = []
+    metadata = post.get("media_metadata") if isinstance(post.get("media_metadata"), dict) else {}
+    gallery = post.get("gallery_data") if isinstance(post.get("gallery_data"), dict) else {}
+    for entry in gallery.get("items", []) if isinstance(gallery.get("items"), list) else []:
+        media_id = str(entry.get("media_id") or "") if isinstance(entry, dict) else ""
+        source = metadata.get(media_id, {}).get("s", {}) if isinstance(metadata.get(media_id), dict) else {}
+        url = source.get("u") if isinstance(source, dict) else ""
+        if url:
+            result.append(html.unescape(str(url)))
+    if not result:
+        destination = str(post.get("url_overridden_by_dest") or "")
+        if re.search(r"\.(?:jpe?g|png|gif|webp|avif)(?:\?|$)", destination, re.IGNORECASE):
+            result.append(destination)
+        preview = post.get("preview") if isinstance(post.get("preview"), dict) else {}
+        images = preview.get("images") if isinstance(preview.get("images"), list) else []
+        if images:
+            source = images[0].get("source", {}) if isinstance(images[0], dict) else {}
+            url = source.get("url") if isinstance(source, dict) else ""
+            if url and url not in result:
+                result.append(html.unescape(str(url)))
+    return result
+
+
+def _read_oembed(endpoint: str, source_url: str, platform: str) -> dict[str, Any]:
+    response = fetch_json(endpoint)
+    try:
+        data = json.loads(response.content)
+    except (ValueError, TypeError) as exc:
+        raise AdapterError("invalid_parser_output", f"{platform} oEmbed returned invalid JSON") from exc
+    if not isinstance(data, dict) or not data.get("title"):
+        raise AdapterError("content_not_found", f"{platform} oEmbed returned no public metadata")
+    if platform == "youtube":
+        source_id = youtube_identity(source_url)[0]
+    elif platform == "reddit":
+        source_id = reddit_identity(source_url)[0]
+    else:
+        source_id = _hash_id(source_url)
+    staging = Path(tempfile.mkdtemp(prefix=f"collecthub-{platform}-oembed-"))
+    files: list[dict[str, str]] = []
+    thumbnail_url = str(data.get("thumbnail_url") or "")
+    if thumbnail_url:
+        try:
+            thumbnail = fetch_image(thumbnail_url)
+            suffix = {"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp"}.get(thumbnail.content_type)
+            if suffix:
+                path = staging / f"{source_id}{suffix}"
+                path.write_bytes(thumbnail.content)
+                files.append({"path": str(path), "kind": "image"})
+        except AdapterError:
+            pass
+    payload: dict[str, Any] = {
+        "info": {
+            "id": source_id,
+            "title": str(data.get("title") or ""),
+            "uploader": str(data.get("author_name") or ""),
+            "webpage_url": source_url,
+        },
+        "files": files,
+        "_staging_dir": str(staging),
+        "oembed": True,
+    }
+    if platform == "reddit":
+        payload["content_type"] = "post"
+    return payload

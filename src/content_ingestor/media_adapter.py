@@ -15,6 +15,9 @@ from .xhs_adapter import AdapterError
 
 _IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".avif"}
 _SUBTITLE_EXTENSIONS = {".vtt", ".srt", ".ass", ".lrc", ".json3"}
+_MAX_IMAGE_BYTES = 20 * 1024 * 1024
+_MAX_SUBTITLE_BYTES = 10 * 1024 * 1024
+_MAX_PERSISTED_MEDIA_BYTES = 100 * 1024 * 1024
 
 
 def read_media(url: str, platform: str, *, gallery_first: bool = False) -> dict[str, Any]:
@@ -41,8 +44,11 @@ def read_media(url: str, platform: str, *, gallery_first: bool = False) -> dict[
 
 
 def cleanup_media(payload: dict[str, Any]) -> None:
+    directories = list(payload.get("_staging_dirs") or [])
     if payload.get("_staging_dir"):
-        shutil.rmtree(str(payload["_staging_dir"]), ignore_errors=True)
+        directories.append(payload["_staging_dir"])
+    for directory in {str(value) for value in directories if value}:
+        shutil.rmtree(directory, ignore_errors=True)
 
 
 def subtitle_text(path: Path) -> str:
@@ -124,18 +130,56 @@ def _run_gallery(python: Path, staging: Path, url: str, cookie: Path | None) -> 
 
 def _manifest(staging: Path) -> list[dict[str, str]]:
     result = []
+    total = 0
     for path in sorted(staging.rglob("*")):
-        if not path.is_file() or path.name.startswith(".gallery") or path.name.endswith(".metadata.json") or path.suffix in {".part", ".ytdl"}:
+        if path.is_symlink() or not path.is_file() or path.name.startswith(".gallery") or path.name.endswith(".metadata.json") or path.suffix in {".part", ".ytdl"}:
             continue
         suffix = path.suffix.lower()
-        if suffix in _IMAGE_EXTENSIONS:
+        try:
+            size = path.stat().st_size
+        except OSError:
+            continue
+        if suffix in _IMAGE_EXTENSIONS and 0 < size <= _MAX_IMAGE_BYTES and _is_image(path):
             kind = "image"
-        elif suffix in _SUBTITLE_EXTENSIONS:
+        elif suffix in _SUBTITLE_EXTENSIONS and 0 < size <= _MAX_SUBTITLE_BYTES and _is_text_sidecar(path):
             kind = "subtitle"
         else:
             continue
+        if total + size > _MAX_PERSISTED_MEDIA_BYTES:
+            continue
+        total += size
         result.append({"path": str(path), "kind": kind})
     return result
+
+
+def _is_image(path: Path) -> bool:
+    try:
+        with path.open("rb") as handle:
+            header = handle.read(32)
+    except OSError:
+        return False
+    return (
+        header.startswith(b"\xff\xd8\xff")
+        or header.startswith(b"\x89PNG\r\n\x1a\n")
+        or header.startswith((b"GIF87a", b"GIF89a"))
+        or (len(header) >= 12 and header[:4] == b"RIFF" and header[8:12] == b"WEBP")
+        or (len(header) >= 12 and header[4:8] == b"ftyp" and header[8:12] in {b"avif", b"avis"})
+    )
+
+
+def _is_text_sidecar(path: Path) -> bool:
+    try:
+        with path.open("rb") as handle:
+            sample = handle.read(4096)
+    except OSError:
+        return False
+    if b"\x00" in sample:
+        return False
+    try:
+        sample.decode("utf-8")
+    except UnicodeDecodeError:
+        return False
+    return True
 
 
 def _secure_cookie(platform: str) -> Path | None:

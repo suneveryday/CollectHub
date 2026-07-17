@@ -23,7 +23,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     ingest.add_argument(
         "--sync", choices=("notion",),
-        help="Sync locally saved items to Notion; YouTube and TikTok videos use this policy by default",
+        help="Explicitly sync locally saved items to Notion",
     )
     doctor = subparsers.add_parser(
         "doctor", help="Check local platform runtimes and optional sync targets"
@@ -65,7 +65,6 @@ def main(argv: list[str] | None = None) -> int:
             args.output,
             force=args.force,
             sync=args.sync,
-            auto_video_notion=args.sync is None,
         )
         payload = {
             "ok": all(result["status"] != "failed" for result in results),

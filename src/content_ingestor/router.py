@@ -32,8 +32,8 @@ def adapter_for(url: str, *, xhs_reader: Reader | None = None) -> PlatformAdapte
         return PlatformAdapter("x", read_x, normalize_x, cleanup_payload, canonicalize_x_url)
     from .platform_adapters import (
         cleanup_hybrid, cleanup_media, facebook_identity, normalize_facebook,
-        normalize_tiktok, normalize_youtube, normalize_zhihu, read_facebook,
-        read_tiktok, read_youtube, read_zhihu, tiktok_identity, youtube_identity,
+        normalize_reddit, normalize_tiktok, normalize_youtube, normalize_zhihu, read_facebook,
+        read_reddit, read_tiktok, read_youtube, read_zhihu, reddit_identity, tiktok_identity, youtube_identity,
         zhihu_identity,
     )
     if _host_is(url, {"youtube.com", "youtu.be"}):
@@ -42,6 +42,8 @@ def adapter_for(url: str, *, xhs_reader: Reader | None = None) -> PlatformAdapte
         return PlatformAdapter("tiktok", read_tiktok, normalize_tiktok, cleanup_media, tiktok_identity)
     if _host_is(url, {"facebook.com", "fb.watch"}):
         return PlatformAdapter("facebook", read_facebook, normalize_facebook, cleanup_hybrid, facebook_identity)
+    if _host_is(url, {"reddit.com", "redd.it"}):
+        return PlatformAdapter("reddit", read_reddit, normalize_reddit, cleanup_hybrid, reddit_identity)
     if _host_is(url, {"zhihu.com"}):
         return PlatformAdapter("zhihu", read_zhihu, normalize_zhihu, cleanup_hybrid, zhihu_identity)
     from .web_adapter import canonicalize_web_url, cleanup_payload, normalize_web, read_web

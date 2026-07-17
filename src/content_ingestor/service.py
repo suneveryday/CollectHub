@@ -20,6 +20,9 @@ def ingest_urls(
     sync: str | None = None,
     auto_video_notion: bool = False,
 ) -> list[dict]:
+    # Kept in the Python API for callers upgrading from 1.1.x. Notion sync is
+    # intentionally explicit in 1.2.0, so this legacy flag no longer acts.
+    del auto_video_notion
     results: list[dict] = []
     owned_notion: NotionClient | None = None
     for url in urls:
@@ -46,11 +49,7 @@ def ingest_urls(
             if local_result["status"] == "partial":
                 item.capture_status = "media_partial"
                 local_result["capture_status"] = item.capture_status
-            should_sync_notion = sync == "notion" or (
-                auto_video_notion
-                and item.platform in {"youtube", "tiktok"}
-                and item.content_type == "video"
-            )
+            should_sync_notion = sync == "notion"
             if should_sync_notion:
                 try:
                     client = notion
@@ -60,8 +59,8 @@ def ingest_urls(
                         client = owned_notion
                     notion_local_path = (
                         ""
-                        if item.platform in {"youtube", "tiktok"}
-                        and item.capture_policy == "metadata_subtitles"
+                        if item.platform in {"youtube", "reddit", "facebook", "tiktok"}
+                        and item.content_type == "video"
                         else local_path
                     )
                     synced = client.save_item(item, local_path=notion_local_path, force=force)
@@ -126,6 +125,7 @@ def _validate_media(item: ContentItem) -> None:
         "youtube": {"video"},
         "tiktok": {"post", "image", "video"},
         "facebook": {"post", "image", "video"},
+        "reddit": {"post", "image", "video"},
         "web": {"webpage", "article"},
     }.get(item.platform, set())
     if item.content_type not in supported_types:
@@ -133,7 +133,7 @@ def _validate_media(item: ContentItem) -> None:
     if item.capture_policy == "metadata_subtitles":
         # Video/audio absence is intentional. Images and subtitle sidecars are best effort.
         return
-    if item.platform in {"x", "web", "zhihu", "facebook"}:
+    if item.platform in {"x", "web", "zhihu", "facebook", "reddit"}:
         if item.capture_status == "metadata_only" and not item.body and not item.article.get("plain_text"):
             return
         missing = [asset for asset in item.media if asset.status == "failed"]

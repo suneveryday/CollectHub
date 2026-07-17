@@ -97,15 +97,20 @@ def find_local_item(output: Path, source_url: str) -> ContentItem | None:
     if not output.is_dir():
         return None
     url_id = _source_id_from_url(source_url)
+    url_platform = _platform_from_url(source_url)
     for metadata_path in output.rglob("metadata.json"):
         try:
             payload = json.loads(metadata_path.read_text(encoding="utf-8"))
             media_payload = payload.get("media") if isinstance(payload.get("media"), list) else []
             if payload.get("ingest_status") != "success":
                 continue
-            if source_url not in {payload.get("source_url"), payload.get("input_url")} and (
-                not url_id or url_id != payload.get("source_id")
-            ):
+            exact_url = source_url in {payload.get("source_url"), payload.get("input_url")}
+            same_identity = (
+                bool(url_id)
+                and url_id == payload.get("source_id")
+                and url_platform == payload.get("platform")
+            )
+            if not exact_url and not same_identity:
                 continue
             target = metadata_path.parent
             if not _existing_local_complete(target, str(payload["content_type"])):
@@ -193,7 +198,7 @@ def _type_label(content_type: str) -> str:
 
 
 def _platform_label(platform: str) -> str:
-    return {"xiaohongshu": "小红书", "x": "X", "zhihu": "知乎", "youtube": "YouTube", "tiktok": "TikTok", "facebook": "Facebook", "web": "网页"}.get(platform, platform)
+    return {"xiaohongshu": "小红书", "x": "X", "zhihu": "知乎", "youtube": "YouTube", "tiktok": "TikTok", "facebook": "Facebook", "reddit": "Reddit", "web": "网页"}.get(platform, platform)
 
 
 def _existing_local_complete(target: Path, content_type: str) -> bool:
@@ -248,7 +253,7 @@ def _source_id_from_url(value: str) -> str:
         if parts and parts[0] in {"shorts", "live", "embed"} and len(parts) > 1:
             return parts[1]
         return parse_qs(urlparse(value).query).get("v", [""])[0]
-    for marker in ("video", "photo", "reel", "videos", "posts", "answer", "p", "pin", "zvideo"):
+    for marker in ("video", "photo", "reel", "videos", "posts", "comments", "answer", "p", "pin", "zvideo"):
         try:
             index = parts.index(marker)
             candidate = parts[index + 1]
@@ -259,11 +264,32 @@ def _source_id_from_url(value: str) -> str:
     return ""
 
 
+def _platform_from_url(value: str) -> str:
+    from urllib.parse import urlparse
+
+    hostname = (urlparse(value).hostname or "").lower().rstrip(".")
+    if hostname == "xhslink.com" or hostname.endswith(".xhslink.com") or hostname == "xiaohongshu.com" or hostname.endswith(".xiaohongshu.com"):
+        return "xiaohongshu"
+    if hostname in {"x.com", "www.x.com", "mobile.x.com", "twitter.com", "www.twitter.com", "mobile.twitter.com"}:
+        return "x"
+    if hostname in {"youtu.be", "www.youtu.be"} or hostname == "youtube.com" or hostname.endswith(".youtube.com"):
+        return "youtube"
+    if hostname == "tiktok.com" or hostname.endswith(".tiktok.com"):
+        return "tiktok"
+    if hostname in {"fb.watch", "www.fb.watch"} or hostname == "facebook.com" or hostname.endswith(".facebook.com"):
+        return "facebook"
+    if hostname in {"redd.it", "www.redd.it", "reddit.com"} or hostname.endswith(".reddit.com"):
+        return "reddit"
+    if hostname == "zhihu.com" or hostname.endswith(".zhihu.com"):
+        return "zhihu"
+    return "web"
+
+
 def _required_kinds(platform: str, content_type: str, media: list[MediaAsset] | list[dict]) -> set[str]:
     if platform == "xiaohongshu":
         return {"video"} if content_type == "video" else {"live"} if content_type == "live_photo" else set()
-    # YouTube/TikTok/Facebook/Zhihu video capture intentionally omits audio/video.
-    if platform in {"youtube", "tiktok", "facebook", "zhihu", "web"}:
+    # Metadata-only video capture intentionally omits audio/video.
+    if platform in {"youtube", "tiktok", "facebook", "reddit", "zhihu", "web"}:
         return set()
     kinds = {
         str(asset.kind if isinstance(asset, MediaAsset) else asset.get("kind", ""))

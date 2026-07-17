@@ -20,7 +20,7 @@ MAX_MEDIA_BYTES = 100 * 1024 * 1024
 MAX_JSON_BYTES = 1024 * 1024
 TRACKING_PARAMETERS = {
     "fbclid", "gclid", "dclid", "msclkid", "mc_cid", "mc_eid", "igshid",
-    "ref", "ref_src", "spm",
+    "ref", "ref_src", "spm", "_r", "_t",
 }
 
 
@@ -91,8 +91,13 @@ def fetch_image(url: str, *, client: httpx.Client | None = None) -> FetchResult:
     return _fetch(url, {"image/"}, MAX_IMAGE_BYTES, client=client)
 
 
-def fetch_json(url: str, *, client: httpx.Client | None = None) -> FetchResult:
-    return _fetch(url, {"application/json"}, MAX_JSON_BYTES, client=client)
+def fetch_json(
+    url: str,
+    *,
+    client: httpx.Client | None = None,
+    headers: dict[str, str] | None = None,
+) -> FetchResult:
+    return _fetch(url, {"application/json"}, MAX_JSON_BYTES, client=client, headers=headers)
 
 
 def _fetch(

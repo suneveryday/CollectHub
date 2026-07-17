@@ -21,14 +21,15 @@ XHS-Downloader is downloaded from its upstream repository into the user's local 
 
 - Project: yt-dlp/yt-dlp
 - Source: https://github.com/yt-dlp/yt-dlp
-- Pinned release: 2026.06.09
+- Pinned release: 2026.07.04
+- Verified wheel SHA-256: `f11f2b11d5a8ac4059f9bdf29fa4407dc7c6bb00c5097e95ca22a7a9db518266`
 - License: Unlicense
 
 ## yt-dlp-ejs
 
 - Project: yt-dlp/ejs
 - Source: https://github.com/yt-dlp/ejs
-- Pinned release: 0.8.0, selected by `yt-dlp[default,pin]` 2026.06.09
+- Pinned release: 0.8.0, selected by `yt-dlp[default,pin]` 2026.07.04
 - License: Unlicense; prebuilt wheels also contain ISC- and MIT-licensed components
 
 gallery-dl, yt-dlp, and yt-dlp-ejs are installed from their upstream Python distributions into an isolated user-local runtime and invoked by CollectHub without being copied into the MIT source archive.

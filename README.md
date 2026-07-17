@@ -26,7 +26,7 @@ CollectHub 把已经成功保存的内容变成普通的 Markdown、JSON 和媒�
 
 ## 02 · 发一个链接，留下完整内容
 
-- **一句话收藏**：把小红书、X、知乎、YouTube、TikTok、Facebook 或普通网页链接直接发给 Agent。
+- **一句话收藏**：把小红书、X、知乎、YouTube、Reddit、Facebook、TikTok 或普通网页链接直接发给 Agent。
 - **把分散内容收进一个地方**：保留正文、图片、封面、字幕、Live Photo、Long Post 和 Article。
 - **真正本地拥有**：内容默认进入 `~/CollectHub`，不依赖某个云端服务才能打开。
 - **自动整理与去重**：按年月和平台归档；重复链接不会制造多份副本。
@@ -57,7 +57,7 @@ CollectHub 首版支持 macOS（Apple Silicon 和 Intel），可安装到 Codex�
 
 ```bash
 curl --proto '=https' --tlsv1.2 -fsSL \
-  https://raw.githubusercontent.com/suneveryday/CollectHub/v1.1.2/install.sh | sh
+  https://raw.githubusercontent.com/suneveryday/CollectHub/v1.2.0/install.sh | sh
 ```
 
 安装器会先说明将要安装的内容和写入位置，得到确认后才会继续。它使用独立运行环境，不会修改系统 Python。
@@ -66,7 +66,7 @@ curl --proto '=https' --tlsv1.2 -fsSL \
 
 ## 04 · 本地内容与视频书签
 
-除 YouTube / TikTok 视频书签外，内容默认保存在 `~/CollectHub`：
+所有成功采集的内容都会在 `~/CollectHub` 保留可去重和恢复的本地记录：
 
 ```text
 ~/CollectHub/
@@ -82,13 +82,13 @@ curl --proto '=https' --tlsv1.2 -fsSL \
 
 | | 当前支持 |
 |---|---|
-| 内容平台 | 小红书、X / Twitter、知乎、YouTube、TikTok、Facebook、公开 HTML 网页 |
+| 内容平台 | 小红书、X / Twitter、知乎、YouTube、Reddit、Facebook、TikTok、公开 HTML 网页 |
 | 内容类型 | 文字、图片、封面、字幕、视频元数据、Live Photo、长帖、Article、网页 |
 | Agent | Codex、Hermes |
 | 操作系统 | macOS arm64、macOS x86_64 |
-| 保存位置 | 本地目录；YouTube / TikTok 视频默认 Notion 书签 |
+| 保存位置 | 本地目录；明确要求时同步到 Notion |
 
-CollectHub 专注于保存你提供的单条内容链接。YouTube 和 TikTok 不下载视频或音频：本地只保留用于去重和恢复的小型元数据，并默认在已配置的 Notion 中创建收藏记录、保存原视频链接。Facebook 也不下载音视频，但仍遵循本地优先。普通网页只做静态提取，不运行脚本，也不处理登录墙、付费墙、验证码或 PDF。
+CollectHub 专注于保存你提供的单条内容链接。YouTube、Reddit、Facebook 和 TikTok 的视频不下载视频或音频：本地只保留用于去重和恢复的小型元数据、封面与可用字幕；明确同步到 Notion 时，保存稳定的原内容页链接、标题、作者、简介、时长和封面。Reddit 支持单条文字、图片、外链和视频帖子，但不抓评论。普通网页只做静态提取，不运行脚本，也不处理登录墙、付费墙、验证码或 PDF。
 
 它不提供账号批量抓取、频道/播放列表采集、平台搜索、登录绕过、AI 摘要、评论或内容发布。
 
@@ -96,7 +96,7 @@ CollectHub 专注于保存你提供的单条内容链接。YouTube 和 TikTok �
 
 ## 可选：同步到 Notion
 
-Notion 对一般内容默认关闭；YouTube 和 TikTok 视频例外，它们在 Notion 已配置时自动创建书签。其他内容需要在请求中明确说“同步到 Notion”，或使用：
+Notion 默认关闭。只有在请求中明确说“同步到 Notion”，或使用下面的参数时才会写入：
 
 ```bash
 content-ingestor ingest '<URL>' --sync notion
@@ -116,19 +116,19 @@ content-ingestor doctor
 预览安装内容：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/suneveryday/CollectHub/v1.1.2/install.sh | sh -s -- --dry-run
+curl -fsSL https://raw.githubusercontent.com/suneveryday/CollectHub/v1.2.0/install.sh | sh -s -- --dry-run
 ```
 
 修复安装：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/suneveryday/CollectHub/v1.1.2/install.sh | sh -s -- --yes --repair
+curl -fsSL https://raw.githubusercontent.com/suneveryday/CollectHub/v1.2.0/install.sh | sh -s -- --yes --repair
 ```
 
 卸载程序：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/suneveryday/CollectHub/v1.1.2/install.sh | sh -s -- --yes --uninstall
+curl -fsSL https://raw.githubusercontent.com/suneveryday/CollectHub/v1.2.0/install.sh | sh -s -- --yes --uninstall
 ```
 
 卸载不会删除 `~/CollectHub` 中已经保存的内容。

@@ -12,4 +12,4 @@
 - `unauthorized`, `restricted_resource`, or `object_not_found`: share the selected data source with the configured Notion integration.
 - `rate_limited` or `cloudflare_blocked`: preserve the local result and retry sync later.
 
-Optional Netscape Cookie files live at `~/.config/collecthub/cookies/{youtube,tiktok,facebook,zhihu}.txt`. They must be current-user-owned regular files with mode `0600` or stricter. Never inspect or echo their contents.
+Optional Netscape Cookie files live at `~/.config/collecthub/cookies/{youtube,reddit,facebook,tiktok,zhihu}.txt`. They must be current-user-owned regular files with mode `0600` or stricter. Anonymous public capture is attempted without credentials when no file exists. Never inspect or echo Cookie contents.

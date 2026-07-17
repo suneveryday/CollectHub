@@ -24,7 +24,7 @@ jobs:
       - run: sh -n install.sh scripts/content-ingestor scripts/install-hermes-skill scripts/install-xhs-downloader scripts/install-x-runtime scripts/install-media-runtime skills/content-ingestor/scripts/setup
       - name: Check repository hygiene
         run: |
-          ! rg -n '/Users/linny|39c6977d-8940-8009-ba73-000b93ec9385|ntn_[A-Za-z0-9_-]{16,}' \
+          ! rg -n '/Users/[[:alnum:]_.-]+/|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|ntn_[A-Za-z0-9_-]{16,}' \
             --glob '!tests/**' --glob '!.git/**' .
 
   install-smoke:

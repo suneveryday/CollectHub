@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-VERSION=1.1.2
+VERSION=1.2.0
 UV_VERSION=0.11.7
 REPOSITORY=suneveryday/CollectHub
 CLIENT=auto
@@ -108,7 +108,7 @@ done
 if [ "$UNINSTALL" -eq 1 ]; then
   echo "Action: uninstall application and managed skills; preserve the local library"
 else
-  echo "Dependencies: uv $UV_VERSION, Python 3.12, XHS-Downloader 2.7, gallery-dl 1.32.1, yt-dlp[default,pin] 2026.06.09, EJS 0.8.0, Deno 2.8.1, Trafilatura 2.1.0"
+  echo "Dependencies: uv $UV_VERSION, Python 3.12, XHS-Downloader 2.7, gallery-dl 1.32.1, yt-dlp[default,pin] 2026.07.04, EJS 0.8.0, Deno 2.8.1, Trafilatura 2.1.0"
   echo "Licenses: CollectHub MIT; external downloader licenses are listed in THIRD_PARTY_NOTICES.md"
   echo "Action: install or update"
 fi
@@ -187,8 +187,8 @@ if [ ! -e "$RELEASE_DIR" ]; then
   done
 
   if [ "$SKIP_RUNTIMES" -ne 1 ]; then
-    UV=$(command -v uv || true)
-    if [ -z "$UV" ] || [ "$("$UV" --version 2>/dev/null | awk '{print $2}')" != "$UV_VERSION" ]; then
+    UV=$APP_ROOT/tools/uv
+    if [ ! -x "$UV" ] || [ "$("$UV" --version 2>/dev/null | awk '{print $2}')" != "$UV_VERSION" ]; then
       case "$(uname -m)" in
         arm64)
           uv_asset=uv-aarch64-apple-darwin.tar.gz
@@ -206,7 +206,6 @@ if [ ! -e "$RELEASE_DIR" ]; then
       printf '%s  %s\n' "$uv_sha256" "$uv_archive" | shasum -a 256 -c -
       mkdir -p "$APP_ROOT/tools"
       tar -xzf "$uv_archive" --strip-components=1 -C "$APP_ROOT/tools"
-      UV=$APP_ROOT/tools/uv
       [ "$("$UV" --version | awk '{print $2}')" = "$UV_VERSION" ] || {
         echo "Installed uv version does not match $UV_VERSION" >&2
         exit 1
@@ -217,7 +216,7 @@ if [ ! -e "$RELEASE_DIR" ]; then
     (cd "$staging" && "$UV" sync --locked --python 3.12 --no-editable)
     CONTENT_OS_XHS_HOME="$APP_ROOT/runtimes/xhs-downloader/2.7" \
       "$staging/scripts/install-xhs-downloader" --apply
-    COLLECTHUB_MEDIA_RUNTIME_HOME="$APP_ROOT/runtimes/media/gallery-dl-1.32.1_yt-dlp-2026.06.09_deno-2.8.1" \
+    COLLECTHUB_MEDIA_RUNTIME_HOME="$APP_ROOT/runtimes/media/gallery-dl-1.32.1_yt-dlp-2026.07.04_deno-2.8.1" \
       "$staging/scripts/install-media-runtime" --apply
   fi
   mv "$staging" "$RELEASE_DIR"
@@ -234,7 +233,7 @@ printf '%s\n' \
   'APP_ROOT=${COLLECTHUB_APP_ROOT:-"$HOME/.local/share/collecthub"}' \
   'export PATH="$APP_ROOT/tools:$PATH"' \
   'export CONTENT_OS_XHS_HOME=${CONTENT_OS_XHS_HOME:-"$APP_ROOT/runtimes/xhs-downloader/2.7"}' \
-  'export COLLECTHUB_MEDIA_RUNTIME_HOME=${COLLECTHUB_MEDIA_RUNTIME_HOME:-${CONTENT_OS_X_RUNTIME_HOME:-"$APP_ROOT/runtimes/media/gallery-dl-1.32.1_yt-dlp-2026.06.09_deno-2.8.1"}}' \
+  'export COLLECTHUB_MEDIA_RUNTIME_HOME=${COLLECTHUB_MEDIA_RUNTIME_HOME:-${CONTENT_OS_X_RUNTIME_HOME:-"$APP_ROOT/runtimes/media/gallery-dl-1.32.1_yt-dlp-2026.07.04_deno-2.8.1"}}' \
   'export CONTENT_OS_X_RUNTIME_HOME=${CONTENT_OS_X_RUNTIME_HOME:-"$COLLECTHUB_MEDIA_RUNTIME_HOME"}' \
   'exec "$APP_ROOT/current/.venv/bin/python" -m content_ingestor.cli "$@"' \
   > "$CLI"

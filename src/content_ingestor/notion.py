@@ -22,6 +22,7 @@ SCHEMA: dict[str, dict[str, Any]] = {
         {"name": "YouTube", "color": "red"},
         {"name": "TikTok", "color": "pink"},
         {"name": "Facebook", "color": "blue"},
+        {"name": "Reddit", "color": "orange"},
         {"name": "网页", "color": "gray"},
     ]}},
     "内容类型": {
@@ -40,8 +41,10 @@ SCHEMA: dict[str, dict[str, Any]] = {
     },
     "内容 ID": {"rich_text": {}},
     "原文链接": {"url": {}},
+    "视频链接": {"url": {}},
     "作者": {"rich_text": {}},
     "发布时间": {"date": {}},
+    "时长（秒）": {"number": {"format": "number"}},
     "收藏时间": {"date": {}},
     "标签": {"multi_select": {"options": []}},
     "本地媒体路径": {"rich_text": {}},
@@ -71,7 +74,6 @@ SCHEMA: dict[str, dict[str, Any]] = {
 
 EXPECTED_PROPERTY_TYPES = {
     "名称": "title",
-    "视频链接": "url",
     **{name: next(iter(spec)) for name, spec in SCHEMA.items()},
 }
 
@@ -208,13 +210,16 @@ class NotionClient:
         page_id = str(page["id"])
         try:
             blocks = self._content_blocks(item, local_path)
+            old_child_ids: list[str] = []
             if existing:
                 self._update_page(page_id, item, local_path, "写入中", "")
-                self._clear_children(page_id)
+                old_child_ids = self._child_ids(page_id)
             for chunk in _chunks(blocks, 100):
                 self._request(
                     "PATCH", f"/blocks/{page_id}/children", json={"children": chunk}, retry_safe=False
                 )
+            if old_child_ids:
+                self._trash_children(old_child_ids)
             self._update_page(page_id, item, local_path, "已完成", "")
         except Exception as exc:
             message = str(exc)
@@ -267,8 +272,10 @@ class NotionClient:
         self, item: ContentItem, local_path: str, status: str, error: str
     ) -> dict[str, Any]:
         video_url = next((asset.url for asset in item.media if asset.kind in {"video", "live"} and asset.url), "")
-        if item.platform in {"youtube", "tiktok"} and item.content_type == "video":
+        if item.platform in {"youtube", "reddit", "facebook", "tiktok"} and item.content_type == "video":
             video_url = item.source_url
+        duration = item.raw.get("duration") if isinstance(item.raw, dict) else None
+        duration_value = float(duration) if isinstance(duration, (int, float)) else None
         properties: dict[str, Any] = {
             "名称": _title(item.title),
             "平台": {"select": {"name": _platform_label(item.platform)}},
@@ -279,6 +286,7 @@ class NotionClient:
             "发布时间": (
                 {"date": {"start": item.published_at}} if item.published_at else {"date": None}
             ),
+            "时长（秒）": {"number": duration_value},
             "收藏时间": {"date": {"start": item.captured_at}},
             "标签": {"multi_select": [{"name": tag[:100]} for tag in item.tags[:100]]},
             "视频链接": {"url": video_url or None},
@@ -383,6 +391,10 @@ class NotionClient:
         return str(upload["id"])
 
     def _clear_children(self, page_id: str) -> None:
+        self._trash_children(self._child_ids(page_id))
+
+    def _child_ids(self, page_id: str) -> list[str]:
+        result: list[str] = []
         cursor: str | None = None
         while True:
             params = {"page_size": 100}
@@ -390,10 +402,16 @@ class NotionClient:
                 params["start_cursor"] = cursor
             payload = self._request("GET", f"/blocks/{page_id}/children", params=params)
             for block in payload.get("results", []):
-                self._request("PATCH", f"/blocks/{block['id']}", json={"in_trash": True})
+                if isinstance(block, dict) and block.get("id"):
+                    result.append(str(block["id"]))
             if not payload.get("has_more"):
                 break
             cursor = payload.get("next_cursor")
+        return result
+
+    def _trash_children(self, child_ids: Iterable[str]) -> None:
+        for child_id in child_ids:
+            self._request("PATCH", f"/blocks/{child_id}", json={"in_trash": True})
 
     def _request(self, method: str, path: str, **kwargs: Any) -> dict[str, Any]:
         retry_safe = bool(kwargs.pop("retry_safe", True))
@@ -639,7 +657,7 @@ def _select_value(page: dict[str, Any], name: str) -> str:
 
 
 def _video_bookmark_needs_refresh(item: ContentItem, page: dict[str, Any]) -> bool:
-    if item.platform not in {"youtube", "tiktok"} or item.content_type != "video":
+    if item.platform not in {"youtube", "reddit", "facebook", "tiktok"} or item.content_type != "video":
         return False
     properties = page.get("properties", {})
     source_url = properties.get("原文链接", {}).get("url")
@@ -757,7 +775,7 @@ def _type_label(content_type: str) -> str:
 
 
 def _platform_label(platform: str) -> str:
-    return {"xiaohongshu": "小红书", "x": "X", "zhihu": "知乎", "youtube": "YouTube", "tiktok": "TikTok", "facebook": "Facebook", "web": "网页"}.get(platform, platform)
+    return {"xiaohongshu": "小红书", "x": "X", "zhihu": "知乎", "youtube": "YouTube", "tiktok": "TikTok", "facebook": "Facebook", "reddit": "Reddit", "web": "网页"}.get(platform, platform)
 
 
 def _page_url(page_id: str) -> str:

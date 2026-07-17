@@ -2,8 +2,11 @@
 set -eu
 
 GALLERY_DL_VERSION=1.32.1
-YT_DLP_VERSION=2026.06.09
+YT_DLP_VERSION=2026.07.04
 YT_DLP_EJS_VERSION=0.8.0
+YT_DLP_WHEEL=yt_dlp-2026.7.4-py3-none-any.whl
+YT_DLP_WHEEL_URL=https://files.pythonhosted.org/packages/f9/8a/cd4c9b02c10c563adfe78118310129641900e1cd6de888cfae2452072696/yt_dlp-2026.7.4-py3-none-any.whl
+YT_DLP_WHEEL_SHA256=f11f2b11d5a8ac4059f9bdf29fa4407dc7c6bb00c5097e95ca22a7a9db518266
 DENO_VERSION=2.8.1
 RUNTIME_VERSION="gallery-dl-$GALLERY_DL_VERSION"_"yt-dlp-$YT_DLP_VERSION"_"deno-$DENO_VERSION"
 TARGET="${COLLECTHUB_MEDIA_RUNTIME_HOME:-${CONTENT_OS_X_RUNTIME_HOME:-$HOME/.local/share/collecthub/runtimes/media/$RUNTIME_VERSION}}"
@@ -39,9 +42,11 @@ cleanup() { rm -rf "$TEMP"; }
 trap cleanup EXIT INT TERM
 
 uv venv --python 3.12 "$TEMP/.venv"
+curl --proto '=https' --tlsv1.2 -fsSL "$YT_DLP_WHEEL_URL" -o "$TEMP/$YT_DLP_WHEEL"
+printf '%s  %s\n' "$YT_DLP_WHEEL_SHA256" "$TEMP/$YT_DLP_WHEEL" | shasum -a 256 -c -
 uv pip install --python "$TEMP/.venv/bin/python" \
   "gallery-dl==$GALLERY_DL_VERSION" \
-  "yt-dlp[default,pin]==$YT_DLP_VERSION"
+  "$TEMP/$YT_DLP_WHEEL[default,pin]"
 
 DENO_ARCHIVE=$TEMP/$DENO_ASSET
 curl --proto '=https' --tlsv1.2 -fsSL \

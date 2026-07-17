@@ -9,13 +9,15 @@ from unittest.mock import patch
 
 import httpx
 
-from content_ingestor.media_adapter import _run_ytdlp, read_media, subtitle_text
+from content_ingestor.media_adapter import _manifest, _run_ytdlp, cleanup_media, read_media, subtitle_text
+from content_ingestor.models import ContentItem
 from content_ingestor.platform_adapters import (
-    facebook_identity, normalize_tiktok, normalize_youtube, read_tiktok, tiktok_identity, youtube_identity, zhihu_identity,
+    facebook_identity, normalize_reddit, normalize_tiktok, normalize_youtube, read_reddit, read_tiktok,
+    reddit_identity, tiktok_identity, youtube_identity, zhihu_identity,
 )
 from content_ingestor.router import adapter_for
 from content_ingestor.service import ingest_urls
-from content_ingestor.storage import find_local_item
+from content_ingestor.storage import find_local_item, save_local_item
 from content_ingestor.web_adapter import _cookie_headers, canonicalize_web_url, normalize_web, read_web
 from content_ingestor.web_fetch import fetch_html, normalize_public_url, validate_public_destination
 from content_ingestor.xhs_adapter import AdapterError
@@ -27,6 +29,7 @@ class MultiPlatformTests(unittest.TestCase):
             "https://youtu.be/abcdefghijk": "youtube",
             "https://www.tiktok.com/@u/video/123456789": "tiktok",
             "https://www.facebook.com/u/posts/123": "facebook",
+            "https://www.reddit.com/r/python/comments/abc123/a_post/": "reddit",
             "https://www.zhihu.com/question/1/answer/2": "zhihu",
             "https://example.com/article": "web",
         }
@@ -39,6 +42,8 @@ class MultiPlatformTests(unittest.TestCase):
             "https://www.youtube.com/playlist?list=PL123",
             "https://www.tiktok.com/@creator",
             "https://www.facebook.com/creator",
+            "https://www.reddit.com/r/python/",
+            "https://www.reddit.com/user/example/",
             "https://www.zhihu.com/search?q=test",
         ]
         for url in bad:
@@ -50,7 +55,13 @@ class MultiPlatformTests(unittest.TestCase):
         self.assertEqual(tiktok_identity("https://www.tiktok.com/@u/photo/123456")[0], "123456")
         self.assertEqual(facebook_identity("https://www.facebook.com/u/posts/123")[0], "123")
         self.assertEqual(facebook_identity("https://www.facebook.com/video.php?v=456")[0], "456")
+        self.assertEqual(reddit_identity("https://redd.it/AbC123"), ("abc123", "https://redd.it/abc123"))
+        self.assertEqual(reddit_identity("https://old.reddit.com/r/python/comments/abc123/title/")[0], "abc123")
         self.assertEqual(zhihu_identity("https://www.zhihu.com/question/1/answer/2")[0], "2")
+        self.assertEqual(
+            tiktok_identity("https://www.tiktok.com/@u/video/123456?_r=1&_t=tracking")[1],
+            "https://www.tiktok.com/@u/video/123456",
+        )
 
     def test_tracking_parameters_and_fragments_do_not_change_web_id(self):
         first = canonicalize_web_url("https://example.com/a?utm_source=x&lang=zh#top")
@@ -191,7 +202,7 @@ class MultiPlatformTests(unittest.TestCase):
             restored = find_local_item(Path(directory) / "library", "https://www.youtube.com/watch?v=abcdefghijk")
             self.assertIsNotNone(restored)
 
-    def test_youtube_video_defaults_to_notion_bookmark_without_local_media_path(self):
+    def test_video_notion_sync_is_explicit_and_omits_local_media_path(self):
         class BookmarkNotion:
             def __init__(self):
                 self.local_paths = []
@@ -207,16 +218,98 @@ class MultiPlatformTests(unittest.TestCase):
                 "files": [],
                 "_staging_dir": directory,
             }
-            result = ingest_urls(
+            local_only = ingest_urls(
                 ["https://youtu.be/abcdefghijk"],
                 Path(directory) / "library",
                 reader=lambda _: payload,
                 notion=notion,
                 auto_video_notion=True,
             )[0]
+            result = ingest_urls(
+                ["https://youtu.be/abcdefghijk"],
+                Path(directory) / "library",
+                reader=lambda _: payload,
+                notion=notion,
+                sync="notion",
+            )[0]
+        self.assertNotIn("sync", local_only)
         self.assertEqual(result["sync"]["notion"]["status"], "success")
         self.assertEqual(result["notion_url"], "https://notion.test/abcdefghijk")
         self.assertEqual(notion.local_paths, [""])
+
+    def test_reddit_public_json_normalizes_single_post_without_comments(self):
+        response = type("Response", (), {"content": json.dumps([
+            {"data": {"children": [{"data": {
+                "id": "abc123", "title": "A public post", "selftext": "Post body",
+                "author": "alice", "subreddit_name_prefixed": "r/python",
+                "created_utc": 1700000000, "score": 42, "upvote_ratio": 0.9,
+                "num_comments": 7, "is_self": True,
+            }}]}},
+            {"data": {"children": [{"data": {"body": "This comment must not be saved"}}]}},
+        ]).encode()})()
+        with patch("content_ingestor.platform_adapters.fetch_json", return_value=response):
+            payload = read_reddit("https://www.reddit.com/r/python/comments/abc123/a_public_post/")
+        item = normalize_reddit(payload, "https://www.reddit.com/r/python/comments/abc123/a_public_post/")
+        self.assertEqual((item.platform, item.content_type, item.source_id), ("reddit", "post", "abc123"))
+        self.assertEqual((item.title, item.body, item.author), ("A public post", "Post body", "alice"))
+        self.assertNotIn("This comment", item.body)
+        self.assertEqual(item.raw["community"], "r/python")
+        self.assertEqual(item.metrics["comment_count"], 7)
+
+    def test_reddit_rejects_response_id_that_does_not_match_requested_post(self):
+        response = type("Response", (), {"content": json.dumps([
+            {"data": {"children": [{"data": {
+                "id": "../outside", "title": "Wrong post", "author": "alice",
+            }}]}}
+        ]).encode()})()
+        with patch("content_ingestor.platform_adapters.fetch_json", return_value=response):
+            with self.assertRaises(AdapterError) as caught:
+                read_reddit("https://www.reddit.com/r/python/comments/abc123/a_public_post/")
+        self.assertEqual(caught.exception.code, "invalid_parser_output")
+
+    def test_reddit_video_keeps_metadata_without_video_file(self):
+        payload = {
+            "info": {"id": "abc123", "title": "Video post", "description": "Caption", "uploader": "alice", "duration": 12},
+            "reddit": {"community": "r/videos", "score": 5},
+            "content_type": "video", "files": [], "_staging_dir": tempfile.mkdtemp(),
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            result = ingest_urls(
+                ["https://redd.it/abc123"], Path(directory), reader=lambda _: payload
+            )[0]
+            assets = list((Path(result["local_path"]) / "assets").glob("*") ) if (Path(result["local_path"]) / "assets").exists() else []
+        self.assertEqual(result["status"], "success")
+        self.assertFalse(any(path.suffix.lower() in {".mp4", ".webm", ".m4a"} for path in assets))
+
+    def test_reddit_oembed_is_anonymous_metadata_fallback(self):
+        response = type("Response", (), {"content": json.dumps({
+            "title": "Public Reddit post", "author_name": "alice", "type": "rich",
+        }).encode()})()
+        with patch("content_ingestor.platform_adapters._read_reddit_json", side_effect=AdapterError("authentication_required", "blocked")), patch(
+            "content_ingestor.platform_adapters.read_media", side_effect=AdapterError("authentication_required", "blocked")
+        ), patch("content_ingestor.platform_adapters.fetch_json", return_value=response):
+            payload = read_reddit("https://redd.it/abc123")
+        item = normalize_reddit(payload, "https://redd.it/abc123")
+        self.assertEqual((item.content_type, item.title, item.author), ("post", "Public Reddit post", "alice"))
+
+    def test_manifest_rejects_video_disguised_as_image(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "cover.jpg"
+            path.write_bytes(b"\x00\x00\x00\x18ftypmp42video")
+            self.assertEqual(_manifest(Path(directory)), [])
+
+    def test_manifest_rejects_oversized_and_symlinked_assets(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            oversized = root / "large.jpg"
+            with oversized.open("wb") as handle:
+                handle.write(b"\xff\xd8\xff")
+                handle.truncate(20 * 1024 * 1024 + 1)
+            target = root / "target.jpg"
+            target.write_bytes(b"\xff\xd8\xffsmall")
+            link = root / "link.jpg"
+            link.symlink_to(target)
+            self.assertEqual(_manifest(root), [{"path": str(target), "kind": "image"}])
 
     def test_missing_subtitles_is_still_complete(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -233,6 +326,34 @@ class MultiPlatformTests(unittest.TestCase):
         item = normalize_tiktok(actual, "https://www.tiktok.com/@u/video/123456")
         self.assertTrue(actual["oembed"])
         self.assertEqual((item.content_type, item.capture_policy), ("video", "metadata_subtitles"))
+
+    def test_tiktok_oembed_success_returns_payload(self):
+        response = type("Response", (), {"content": json.dumps({
+            "embed_product_id": "123456", "title": "Post", "author_name": "alice",
+        }).encode()})()
+        with patch("content_ingestor.platform_adapters.fetch_json", return_value=response), patch(
+            "content_ingestor.platform_adapters.fetch_image", side_effect=AdapterError("upstream_failed", "no cover")
+        ):
+            payload = read_tiktok("https://www.tiktok.com/@u/video/123456")
+        try:
+            self.assertIsInstance(payload, dict)
+            self.assertEqual(payload["info"]["id"], "123456")
+        finally:
+            cleanup_media(payload)
+
+    def test_cross_platform_id_collision_does_not_reuse_local_item(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory)
+            saved = ContentItem(
+                schema_version="3", platform="web", content_type="webpage", source_id="abc123",
+                source_url="https://example.com/unrelated", title="Unrelated", body="Private local body",
+                author="", published_at=None, captured_at="2026-07-17T00:00:00+00:00",
+            )
+            save_local_item(saved, output)
+            result = find_local_item(
+                output, "https://www.reddit.com/r/security/comments/abc123/example/"
+            )
+        self.assertIsNone(result)
 
     def test_subtitle_cleaner_removes_timing_and_duplicates(self):
         with tempfile.TemporaryDirectory() as directory:

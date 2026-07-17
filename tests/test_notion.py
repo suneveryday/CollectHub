@@ -102,10 +102,12 @@ class NotionTests(unittest.TestCase):
         self.assertEqual(payload["内容类型"]["select"]["name"], "Long Post")
         self.assertEqual(payload["抓取状态"]["select"]["name"], "media_partial")
 
-    def test_youtube_and_tiktok_bookmarks_use_source_as_video_url(self):
+    def test_video_platform_bookmarks_use_source_as_video_url(self):
         client = BlockClient()
         for platform, source_url in (
             ("youtube", "https://www.youtube.com/watch?v=abcdefghijk"),
+            ("reddit", "https://www.reddit.com/r/videos/comments/abc123/example"),
+            ("facebook", "https://www.facebook.com/reel/123456"),
             ("tiktok", "https://www.tiktok.com/@creator/video/123456"),
         ):
             video = item("video", platform=platform)
@@ -113,6 +115,13 @@ class NotionTests(unittest.TestCase):
             payload = client._properties(video, "", "已完成", "")
             self.assertEqual(payload["原文链接"]["url"], source_url)
             self.assertEqual(payload["视频链接"]["url"], source_url)
+
+    def test_video_duration_is_written_as_number(self):
+        client = BlockClient()
+        video = item("video", platform="youtube")
+        video.raw = {"duration": 125}
+        payload = client._properties(video, "", "已完成", "")
+        self.assertEqual(payload["时长（秒）"]["number"], 125.0)
 
     def test_legacy_video_bookmark_without_video_url_requires_refresh(self):
         video = item("video", platform="youtube")
@@ -133,6 +142,50 @@ class NotionTests(unittest.TestCase):
         }
         self.assertTrue(_video_bookmark_needs_refresh(video, legacy))
         self.assertFalse(_video_bookmark_needs_refresh(video, current))
+
+    def test_failed_legacy_video_refresh_preserves_old_children(self):
+        class RefreshClient(BlockClient):
+            def __init__(self):
+                super().__init__()
+                self.trashed = []
+                self.events = []
+
+            def find_record(self, _item):
+                return {
+                    "id": "page-1",
+                    "properties": {
+                        "保存状态": {"select": {"name": "已完成"}},
+                        "抓取状态": {"select": {"name": "complete"}},
+                        "原文链接": {"url": "https://redd.it/note-1"},
+                        "视频链接": {"url": None},
+                        "本地媒体路径": {"rich_text": []},
+                    },
+                }
+
+            def _content_blocks(self, _item, _local_path):
+                return [{"type": "paragraph", "paragraph": {"rich_text": []}}]
+
+            def _update_page(self, _page_id, _item, _local_path, status, _error):
+                self.events.append(("status", status))
+
+            def _child_ids(self, _page_id):
+                self.events.append(("snapshot", "old-child"))
+                return ["old-child"]
+
+            def _trash_children(self, child_ids):
+                self.trashed.extend(child_ids)
+
+            def _request(self, method, path, **_kwargs):
+                self.events.append((method, path))
+                raise NotionError("notion_request", "network_error", "append failed")
+
+        client = RefreshClient()
+        video = item("video", platform="reddit")
+        video.source_url = "https://redd.it/note-1"
+        with self.assertRaises(NotionError):
+            client.save_item(video)
+        self.assertEqual(client.trashed, [])
+        self.assertIn(("snapshot", "old-child"), client.events)
 
     def test_xhs_images_keep_source_order_before_body(self):
         with tempfile.TemporaryDirectory() as directory:

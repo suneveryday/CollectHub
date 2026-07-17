@@ -14,7 +14,7 @@ Each item contains:
 
 Schema v3 adds `capture_policy` and structured `subtitles`. Video platforms use `metadata_subtitles`: missing video/audio files are intentional, and a source with no available subtitles can still be complete.
 
-YouTube and TikTok video commands automatically request a Notion bookmark. The local item remains a small idempotency and recovery record; Notion receives the original source URL in both the source-link and video-link properties, with no local media path advertised as a downloaded video.
+YouTube, Reddit, Facebook, and TikTok video captures keep only a small idempotency and recovery record locally. With explicit `--sync notion`, Notion receives the stable source page URL in both the source-link and video-link properties, plus available title, author, description, duration, cover, and subtitles. No local path is advertised as a downloaded video.
 
 Top-level statuses:
 
@@ -25,4 +25,4 @@ Top-level statuses:
 
 Successful, partial, and already-saved results include `local_path` and the compatibility alias `target_dir`.
 
-When `--sync notion` is present, the result also contains `sync.notion.status` plus `url` or `error`. A Notion failure does not change the local status. `notion_url` remains as a compatibility alias when a Notion URL exists.
+Only `--sync notion` enables synchronization. The result then contains `sync.notion.status` plus `url` or `error`. A Notion failure does not change the local status. `notion_url` remains as a compatibility alias when a Notion URL exists.

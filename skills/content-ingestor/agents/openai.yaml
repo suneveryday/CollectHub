@@ -1,5 +1,5 @@
 interface:
   display_name: "CollectHub Content Ingestor"
-  short_description: "Save links and bookmark YouTube or TikTok in Notion"
-  default_prompt: "Use $content-ingestor to save these links, automatically bookmark YouTube and TikTok videos in Notion, and keep other Notion sync explicit."
+  short_description: "Save public social posts and optional video bookmarks"
+  default_prompt: "Use $content-ingestor to save these public links locally, and sync to Notion only when I explicitly request it."
   brand_color: "#2563EB"

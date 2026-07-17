@@ -330,7 +330,7 @@ class IngestorTests(unittest.TestCase):
                 "content_ingestor.doctor.x_python", return_value=python,
             ), patch(
                 "content_ingestor.doctor._module_version",
-                side_effect=lambda _, module: "1.32.1" if module == "gallery_dl" else "2026.06.09",
+                side_effect=lambda _, module: "1.32.1" if module == "gallery_dl" else "2026.07.04",
             ), patch(
                 "content_ingestor.doctor._package_version", return_value="0.8.0",
             ), patch(

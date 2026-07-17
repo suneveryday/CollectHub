@@ -71,7 +71,7 @@ def run_doctor(*, sync: str | None = None) -> dict:
         checks.append(_check("cookie_file", cookie_ok, detail))
     else:
         checks.append({"name": "cookie_file", "ok": True, "optional": True, "detail": f"not configured: {cookie}"})
-    for platform in ("youtube", "tiktok", "facebook", "zhihu"):
+    for platform in ("youtube", "tiktok", "facebook", "reddit", "zhihu"):
         candidate = platform_cookie_file(platform)
         if candidate.exists():
             cookie_ok, detail = validate_cookie_file(candidate)
