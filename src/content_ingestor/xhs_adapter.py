@@ -22,11 +22,11 @@ class AdapterError(RuntimeError):
 def read_xhs(url: str) -> dict[str, Any]:
     home = xhs_home()
     python = xhs_python()
-    bridge = Path(__file__).resolve().parents[2] / "scripts/xhs_downloader_bridge.py"
-    if not python.is_file() or not home.is_dir():
+    bridge = Path(__file__).resolve().with_name("xhs_downloader_bridge.py")
+    if not python.is_file() or not home.is_dir() or not bridge.is_file():
         raise AdapterError(
             "dependency_missing",
-            "XHS-Downloader 2.7 is not installed; rerun the CollectHub installer with --repair",
+            "CollectHub's XHS runtime is incomplete; rerun the CollectHub installer with --repair",
         )
 
     staging = Path(tempfile.mkdtemp(prefix="content-os-xhs-"))
@@ -55,7 +55,10 @@ def read_xhs(url: str) -> dict[str, Any]:
         payload = json.loads(proc.stdout)
     except json.JSONDecodeError as exc:
         shutil.rmtree(staging, ignore_errors=True)
-        raise AdapterError("invalid_parser_output", "XHS-Downloader bridge returned invalid JSON") from exc
+        detail = "XHS-Downloader bridge returned invalid JSON"
+        if proc.returncode and proc.stderr.strip():
+            detail = "XHS-Downloader bridge failed before returning JSON"
+        raise AdapterError("invalid_parser_output", detail) from exc
 
     if not payload.get("ok"):
         shutil.rmtree(staging, ignore_errors=True)

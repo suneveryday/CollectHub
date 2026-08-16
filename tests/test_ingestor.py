@@ -9,12 +9,13 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+import content_ingestor.xhs_adapter as xhs_adapter
 from content_ingestor.doctor import run_doctor, validate_cookie_file
 from content_ingestor.config import notion_data_source_id, notion_token
 from content_ingestor.notion import NotionError
 from content_ingestor.service import ingest_urls
 from content_ingestor.storage import find_local_item, safe_name, save_local_item
-from content_ingestor.xhs_adapter import AdapterError, normalize_xhs
+from content_ingestor.xhs_adapter import AdapterError, normalize_xhs, read_xhs
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -71,6 +72,33 @@ class FailOnceNotion(FakeNotion):
 
 
 class IngestorTests(unittest.TestCase):
+    def test_xhs_reader_uses_bridge_packaged_next_to_adapter(self):
+        with tempfile.TemporaryDirectory() as directory:
+            runtime = Path(directory) / "runtime"
+            python = runtime / ".venv/bin/python"
+            python.parent.mkdir(parents=True)
+            python.write_text("")
+            response = subprocess.CompletedProcess(
+                [],
+                0,
+                stdout=json.dumps({"ok": True, "upstream_version": "2.7"}),
+                stderr="",
+            )
+            with patch("content_ingestor.xhs_adapter.xhs_home", return_value=runtime), patch(
+                "content_ingestor.xhs_adapter.xhs_python", return_value=python
+            ), patch(
+                "content_ingestor.xhs_adapter.cookie_file", return_value=Path(directory) / "missing-cookie"
+            ), patch("content_ingestor.xhs_adapter.subprocess.run", return_value=response) as run:
+                payload = read_xhs("https://xhslink.com/demo")
+
+            bridge = Path(run.call_args.args[0][1])
+            self.assertEqual(
+                bridge,
+                Path(xhs_adapter.__file__).with_name("xhs_downloader_bridge.py"),
+            )
+            self.assertTrue(bridge.is_file())
+            self.assertEqual(payload["upstream_version"], "2.7")
+
     def test_normalizes_xhs_downloader_image_note(self):
         payload = staged_payload("xhs_image.json")
         item = normalize_xhs(payload, "https://www.xiaohongshu.com/explore/abc123")
