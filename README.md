@@ -57,7 +57,7 @@ CollectHub 首版支持 macOS（Apple Silicon 和 Intel），可安装到 Codex�
 
 ```bash
 curl --proto '=https' --tlsv1.2 -fsSL \
-  https://raw.githubusercontent.com/suneveryday/CollectHub/v1.2.0/install.sh | sh
+  https://raw.githubusercontent.com/suneveryday/CollectHub/v1.2.1/install.sh | sh
 ```
 
 安装器会先说明将要安装的内容和写入位置，得到确认后才会继续。它使用独立运行环境，不会修改系统 Python。
@@ -116,19 +116,19 @@ content-ingestor doctor
 预览安装内容：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/suneveryday/CollectHub/v1.2.0/install.sh | sh -s -- --dry-run
+curl -fsSL https://raw.githubusercontent.com/suneveryday/CollectHub/v1.2.1/install.sh | sh -s -- --dry-run
 ```
 
 修复安装：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/suneveryday/CollectHub/v1.2.0/install.sh | sh -s -- --yes --repair
+curl -fsSL https://raw.githubusercontent.com/suneveryday/CollectHub/v1.2.1/install.sh | sh -s -- --yes --repair
 ```
 
 卸载程序：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/suneveryday/CollectHub/v1.2.0/install.sh | sh -s -- --yes --uninstall
+curl -fsSL https://raw.githubusercontent.com/suneveryday/CollectHub/v1.2.1/install.sh | sh -s -- --yes --uninstall
 ```
 
 卸载不会删除 `~/CollectHub` 中已经保存的内容。

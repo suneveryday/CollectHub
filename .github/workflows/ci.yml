@@ -65,7 +65,15 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           version="${GITHUB_REF_NAME#v}"
-          gh release create "$GITHUB_REF_NAME" \
-            "collecthub-$version.tar.gz" "collecthub-$version.tar.gz.sha256" \
-            --title "CollectHub $GITHUB_REF_NAME" \
-            --generate-notes
+          notes="release-notes/$version.md"
+          if [ -f "$notes" ]; then
+            gh release create "$GITHUB_REF_NAME" \
+              "collecthub-$version.tar.gz" "collecthub-$version.tar.gz.sha256" \
+              --title "CollectHub $GITHUB_REF_NAME" \
+              --notes-file "$notes"
+          else
+            gh release create "$GITHUB_REF_NAME" \
+              "collecthub-$version.tar.gz" "collecthub-$version.tar.gz.sha256" \
+              --title "CollectHub $GITHUB_REF_NAME" \
+              --generate-notes
+          fi

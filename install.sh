@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-VERSION=1.2.0
+VERSION=1.2.1
 UV_VERSION=0.11.7
 REPOSITORY=suneveryday/CollectHub
 CLIENT=auto
